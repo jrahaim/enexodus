@@ -62,9 +62,10 @@ struct MarkdownRenderer {
 
     /// How to treat Evernote's `<div><br/></div>` spacer lines.
     enum Spacing: String, CaseIterable, Sendable {
-        /// Reproduce every spacer as a blank line — what the note looked like in Evernote.
+        /// Reproduce every spacer as a blank line — exactly what the note looked like in
+        /// Evernote. Use when the archive must mirror the source rather than read well.
         case faithful
-        /// Drop spacers in notes that use one after *every* line.
+        /// Default. Drop spacers in notes that use one after *every* line.
         ///
         /// A separator that appears everywhere separates nothing: it is a typing habit, not
         /// structure. Notes that use spacers only at some boundaries are left alone, because
@@ -72,7 +73,7 @@ struct MarkdownRenderer {
         case tight
     }
 
-    init(resources: ResourceIndex = .empty, spacing: Spacing = .faithful) {
+    init(resources: ResourceIndex = .empty, spacing: Spacing = .tight) {
         self.resources = resources
         self.spacing = spacing
     }

@@ -19,7 +19,7 @@ name, so the **filename is the notebook name**.
 | Flag | Command | Meaning |
 | --- | --- | --- |
 | `--clean` | convert | Delete each target notebook directory before writing it |
-| `--spacing faithful\|tight` | convert | How to treat Evernote's blank-line spacers (default `faithful`) |
+| `--spacing tight\|faithful` | convert | Blank-line spacer policy (default `tight`) |
 | `--quiet` | convert | Print only the summary |
 | `--json` | verify | Emit the report as JSON |
 
@@ -55,10 +55,10 @@ Related consequences of that model:
 - A container whose text is entirely in a monospace font becomes a fenced code block, and
   consecutive such lines fuse into one fence. Older exports have no `--en-codeblock` marker —
   in one real 255-note export only 2 notes used it, versus 37 using monospace fonts.
-- `--spacing tight` drops blank lines in notes that put one after *every* line — a typing
+- **Spacing (default `tight`).** Drops blank lines in notes that put one after *every* line — a typing
   habit rather than structure. Notes that use blank lines selectively are left untouched, and a
   run of two or more spacers always survives as one blank line. On a real 16-note notebook it
-  changed 3 notes and left 13 alone.
+  changed 3 notes and left 13 alone. `--spacing faithful` reproduces every spacer instead.
 - U+00A0 and friends are normalized to ordinary spaces. Evernote uses non-breaking space as its
   everyday word separator, which silently breaks Obsidian search and `grep`. Whitespace is
   outside the losslessness contract, so this is safe.

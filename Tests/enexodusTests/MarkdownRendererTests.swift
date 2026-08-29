@@ -274,6 +274,10 @@ final class MarkdownRendererTests: XCTestCase {
         MarkdownRenderer(spacing: .tight).renderENML("<en-note>\(body)</en-note>").markdown
     }
 
+    private func faithful(_ body: String) -> String {
+        MarkdownRenderer(spacing: .faithful).renderENML("<en-note>\(body)</en-note>").markdown
+    }
+
     /// A separator that appears after every single line separates nothing — it is a typing
     /// habit. `tight` drops those, while leaving alone notes that use blank lines selectively.
     func testTightDropsUniformSpacersButKeepsSelectiveOnes() {
@@ -283,9 +287,9 @@ final class MarkdownRendererTests: XCTestCase {
             "line 1\nline 2\nline 3\nline 4\nline 5\nline 6"
         )
 
-        // Same note under the default policy keeps every spacer.
+        // The same note under the faithful policy keeps every spacer.
         XCTAssertEqual(
-            markdown(uniform),
+            faithful(uniform),
             "line 1\n\nline 2\n\nline 3\n\nline 4\n\nline 5\n\nline 6"
         )
     }
@@ -294,7 +298,7 @@ final class MarkdownRendererTests: XCTestCase {
         let selective =
             "<div>a</div><div>b</div><div>c</div><div><br/></div><div>d</div><div>e</div>"
         XCTAssertEqual(tight(selective), "a\nb\nc\n\nd\ne")
-        XCTAssertEqual(tight(selective), markdown(selective), "policy must not alter this note")
+        XCTAssertEqual(tight(selective), faithful(selective), "policy must not alter this note")
     }
 
     /// Even in a note that double-spaces everything, a deliberate double gap is emphatic.

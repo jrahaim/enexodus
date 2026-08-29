@@ -28,12 +28,12 @@ struct ConvertCommand: ParsableCommand {
     @Option(
         name: .customLong("spacing"),
         help: ArgumentHelp(
-            "How to treat Evernote's blank-line spacers: 'faithful' keeps every one, "
-                + "'tight' drops them in notes that put a blank line after every single line.",
+            "How to treat Evernote's blank-line spacers: 'tight' (default) drops them in "
+                + "notes that put a blank line after every single line; 'faithful' keeps every one.",
             valueName: "faithful|tight"
         )
     )
-    var spacing: MarkdownRenderer.Spacing = .faithful
+    var spacing: MarkdownRenderer.Spacing = .tight
 
     @Flag(name: [.customShort("q"), .customLong("quiet")], help: "Print only the summary.")
     var quiet = false

@@ -79,7 +79,7 @@ final class VaultWriter {
         notebookName: String,
         sourceFileName: String,
         clean: Bool,
-        spacing: MarkdownRenderer.Spacing = .faithful
+        spacing: MarkdownRenderer.Spacing = .tight
     ) throws {
         self.notebookName = notebookName
         self.sourceFileName = sourceFileName
