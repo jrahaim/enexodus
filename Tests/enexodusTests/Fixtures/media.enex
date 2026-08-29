@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE en-export SYSTEM "http://xml.evernote.com/pub/evernote-export4.dtd">
+<en-export export-date="20240101T000000Z" application="Evernote" version="10.60.5">
+  <note>
+    <title>Photo and spec</title>
+    <content><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE en-note SYSTEM "http://xml.evernote.com/pub/enml2.dtd">
+<en-note><div>Here is the diagram:</div><div><en-media hash="b357a19c87624c7c4d131aeeb4ae677f" type="image/png"/></div><div>And the spec, which has no filename in the export:</div><div><en-media hash="1bbc324fd49ac1b6e692f4520dcc42d7" type="application/pdf"/></div></en-note>]]></content>
+    <created>20230210T120000Z</created>
+    <updated>20230210T120000Z</updated>
+    <tag>reference</tag>
+    <resource>
+      <data encoding="base64">
+iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==
+      </data>
+      <mime>image/png</mime>
+      <width>1</width>
+      <height>1</height>
+      <resource-attributes>
+        <file-name>diagram.png</file-name>
+      </resource-attributes>
+    </resource>
+    <resource>
+      <data encoding="base64">
+JVBERi0xLjQKMSAwIG9iajw8L1R5cGUvQ2F0YWxvZz4+ZW5kb2JqCnRyYWlsZXI8PC9Sb290IDEgMCBSPj4KJSVFT0YK
+      </data>
+      <mime>application/pdf</mime>
+      <resource-attributes>
+        <source-url>https://example.com/spec.pdf</source-url>
+      </resource-attributes>
+    </resource>
+  </note>
+  <note>
+    <title>Broken reference</title>
+    <content><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE en-note SYSTEM "http://xml.evernote.com/pub/enml2.dtd">
+<en-note><div>The image below was never exported:</div><div><en-media hash="00000000000000000000000000000000" type="image/png"/></div><div>Everything after it must survive.</div></en-note>]]></content>
+    <created>20230211T120000Z</created>
+    <updated>20230211T120000Z</updated>
+  </note>
+</en-export>

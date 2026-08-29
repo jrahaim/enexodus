@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE en-export SYSTEM "http://xml.evernote.com/pub/evernote-export4.dtd">
+<en-export export-date="20240101T000000Z" application="Evernote" version="10.60.5">
+  <note>
+    <title>Simple table</title>
+    <content><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE en-note SYSTEM "http://xml.evernote.com/pub/enml2.dtd">
+<en-note><div>Stock on hand:</div><table><tr><td>Name</td><td>Qty</td></tr><tr><td>Widget</td><td>3</td></tr><tr><td>Grommet | large</td><td>12</td></tr></table></en-note>]]></content>
+    <created>20220601T090000Z</created>
+    <updated>20220601T090000Z</updated>
+    <tag>inventory</tag>
+  </note>
+  <note>
+    <title>Merged cells</title>
+    <content><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE en-note SYSTEM "http://xml.evernote.com/pub/enml2.dtd">
+<en-note><table><tr><td colspan="2">Spanning header</td></tr><tr><td>A</td><td>B</td></tr></table></en-note>]]></content>
+    <created>20220602T090000Z</created>
+    <updated>20220602T090000Z</updated>
+  </note>
+  <note>
+    <title>Nested table</title>
+    <content><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE en-note SYSTEM "http://xml.evernote.com/pub/enml2.dtd">
+<en-note><table><tr><td>Outer left</td><td><table><tr><td>inner one</td><td>inner two</td></tr></table></td></tr></table></en-note>]]></content>
+    <created>20220603T090000Z</created>
+    <updated>20220603T090000Z</updated>
+  </note>
+</en-export>

@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE en-export SYSTEM "http://xml.evernote.com/pub/evernote-export4.dtd">
+<en-export export-date="20240101T000000Z" application="Evernote" version="10.60.5">
+  <note>
+    <title>Meeting notes</title>
+    <content><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE en-note SYSTEM "http://xml.evernote.com/pub/enml2.dtd">
+<en-note><div>Kickoff at <b>09:00</b> in the <i>blue room</i>.</div><div><br/></div><div><br/></div><div>Agenda is below.</div></en-note>]]></content>
+    <created>20190402T143100Z</created>
+    <updated>20231119T090200Z</updated>
+    <tag>work</tag>
+    <tag>meetings</tag>
+    <note-attributes>
+      <author>Jay</author>
+    </note-attributes>
+  </note>
+  <note>
+    <title>Links and formatting</title>
+    <content><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE en-note SYSTEM "http://xml.evernote.com/pub/enml2.dtd">
+<en-note><div>See <a href="https://example.com/docs">the docs</a> and <a href="https://example.com/a(b)">this one</a>.</div><div>Struck: <s>old plan</s>. Underlined: <u>keep</u>. Code: <code>swift build</code>.</div><h2>A heading</h2><div>Trailing paragraph.</div></en-note>]]></content>
+    <created>20200115T101500Z</created>
+    <updated>20200115T101500Z</updated>
+    <note-attributes>
+      <source-url>https://example.com/source</source-url>
+    </note-attributes>
+  </note>
+  <note>
+    <title>Nested lists</title>
+    <content><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE en-note SYSTEM "http://xml.evernote.com/pub/enml2.dtd">
+<en-note><ul><li>First</li><li>Second<ul><li>Second A</li><li>Second B</li></ul></li><li>Third</li></ul><ol><li>Step one</li><li>Step two</li></ol></en-note>]]></content>
+    <created>20210630T080000Z</created>
+    <updated>20210630T080000Z</updated>
+    <tag>lists</tag>
+  </note>
+</en-export>

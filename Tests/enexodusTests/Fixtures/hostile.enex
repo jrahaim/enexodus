@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE en-export SYSTEM "http://xml.evernote.com/pub/evernote-export4.dtd">
+<en-export export-date="20240101T000000Z" application="Evernote" version="10.60.5">
+  <note>
+    <title>../../etc/passwd</title>
+    <content><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE en-note SYSTEM "http://xml.evernote.com/pub/enml2.dtd">
+<en-note><div>A note whose title tries to escape the notebook directory.</div></en-note>]]></content>
+    <created>20230101T000000Z</created>
+    <updated>20230101T000000Z</updated>
+  </note>
+  <note>
+    <title>🚀 Retrospective on migrating away from Evernote including every decision we made along the way and why the tooling had to be written from scratch instead of reused wholesale</title>
+    <content><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE en-note SYSTEM "http://xml.evernote.com/pub/enml2.dtd">
+<en-note><div>Long titles must be truncated without splitting a character.</div></en-note>]]></content>
+    <created>20230102T000000Z</created>
+    <updated>20230102T000000Z</updated>
+    <tag>meta</tag>
+    <tag>needs: review</tag>
+  </note>
+  <note>
+    <title>Duplicate title</title>
+    <content><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE en-note SYSTEM "http://xml.evernote.com/pub/enml2.dtd">
+<en-note><div>First note with this title.</div></en-note>]]></content>
+    <created>20230103T000000Z</created>
+    <updated>20230103T000000Z</updated>
+  </note>
+  <note>
+    <title>Duplicate title</title>
+    <content><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE en-note SYSTEM "http://xml.evernote.com/pub/enml2.dtd">
+<en-note><div>Second note with the same title.</div></en-note>]]></content>
+    <created>20230104T000000Z</created>
+    <updated>20230104T000000Z</updated>
+  </note>
+  <note>
+    <title>Empty body</title>
+    <content><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE en-note SYSTEM "http://xml.evernote.com/pub/enml2.dtd">
+<en-note></en-note>]]></content>
+    <created>20230105T000000Z</created>
+    <updated>20230105T000000Z</updated>
+  </note>
+  <note>
+    <title>Encrypted block</title>
+    <content><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE en-note SYSTEM "http://xml.evernote.com/pub/enml2.dtd">
+<en-note><div>Secret follows:</div><div><en-crypt cipher="RC2" length="64">RU5DUllQVEVEREFUQQ==</en-crypt></div><div>And normal text after it.</div></en-note>]]></content>
+    <created>20230106T000000Z</created>
+    <updated>20230106T000000Z</updated>
+  </note>
+  <note>
+    <title>Entities and markdown metacharacters</title>
+    <content><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE en-note SYSTEM "http://xml.evernote.com/pub/enml2.dtd">
+<en-note><div>Caf&eacute; &amp; bar &mdash; 5 &lt; 10.&nbsp;Price: 50&nbsp;&euro;</div><div># Not a heading</div><div>- not a list item</div><div>1. not an ordered item</div><div>a_b_c, *stars*, [brackets], `ticks`, and a &lt;tag&gt;</div></en-note>]]></content>
+    <created>20230107T000000Z</created>
+    <updated>20230107T000000Z</updated>
+  </note>
+</en-export>
