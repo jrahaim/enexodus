@@ -174,7 +174,7 @@ macOS 14+ or Linux. Swift 6.0+.
 swift test
 ```
 
-105 tests covering the parser, renderer, writer, verifier, and end-to-end conversion.
+109 tests covering the parser, renderer, writer, verifier, and end-to-end conversion.
 
 Fixtures live in `Tests/enexodusTests/Fixtures/` and are entirely synthetic — no real note
 content, by design. `Fixtures/expected/` holds the golden vault the end-to-end tests compare

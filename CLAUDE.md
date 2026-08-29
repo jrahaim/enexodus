@@ -3,6 +3,8 @@
 Internal context for anyone (human or agent) changing this code. The user-facing docs are
 `README.md` and `--help`; this file is the *why*, plus the traps.
 
+Repo: <https://github.com/jrahaim/enexodus> (public, MIT).
+
 ## What it is
 
 A Swift Package Manager executable converting Evernote ENEX exports to a folder-per-notebook
@@ -36,6 +38,9 @@ whole block model turns on it.
 2. **Determinism.** No run timestamps, no wall-clock, no hash-order iteration in output. A
    second conversion into the same vault must produce byte-identical files. `Date.now`,
    `Math.random`-equivalents and unordered dictionary iteration in emitters are all bugs.
+   Note this *includes* the filesystem timestamps: `VaultWriter.applyTimestamps` derives them
+   from the note's own `<created>`/`<updated>`, so a re-run reproduces them. Stamping from the
+   clock would break this.
 3. **Two independent count paths in `verify`.** The ENEX side re-parses; the vault side reads
    only files on disk. Never make one derive from the other, or the check becomes a tautology.
    They share only `VaultWriter.locations` and the two marker constants — that shared surface is
@@ -69,12 +74,20 @@ whole block model turns on it.
 - **Evernote has two unrelated checklist encodings.** `<en-todo/>`, and
   `<ul style="--en-todo:true">` with `--en-checked:true|false` on items. The second is ~5x more
   common in real exports. Missing it silently turns every checkbox into a plain bullet.
+- **Evernote splits exports at 100 notes.** One notebook arrives as `Name.enex`,
+  `Name (1).enex`, `Name (2).enex`. `VaultWriter.locations` folds a trailing parenthesised
+  integer so they share one folder and one filename-collision namespace. Only integers fold —
+  `Recipes (old)` must stay its own notebook.
+- **Files carry the note's dates, not the conversion time.** Without it a whole vault sorts as
+  a single day. Creation date is Darwin-only (Linux has no settable birth time), attachments
+  inherit their note's dates, and stamping failure is deliberately non-fatal — a wrong
+  timestamp must never cost a note.
 - **`<div>` is a line, not a paragraph.** Getting this backwards double-spaces every note and
   discards the author's real blank lines. This was the single biggest output-quality bug.
 
 ## Testing
 
-`swift test` — 105 tests. Golden trees in `Tests/enexodusTests/Fixtures/expected/` are compared
+`swift test` — 109 tests. Golden trees in `Tests/enexodusTests/Fixtures/expected/` are compared
 byte-for-byte, so any intentional rendering change means regenerating them:
 
 ```bash
@@ -99,4 +112,5 @@ splitting out a library target, which changes the layout in the plan.
 - `Cordia New` and other non-standard fonts used for code are not detected — only a closed list
   of known monospace families is. Widening it risks turning prose into code blocks.
 - Notebook *stacks* are unrecoverable; ENEX does not record them.
-- Naming: the plan calls the product `enexodus`; the containing directory is `exenodus`.
+- Phase 2 is untouched: no `--config`, no `--flat` layout, no CommonMark/Obsidian output
+  toggle, no CI matrix, no prebuilt binaries.
