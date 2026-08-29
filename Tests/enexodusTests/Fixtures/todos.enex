@@ -26,4 +26,13 @@
     <created>20220501T090000Z</created>
     <updated>20220501T090000Z</updated>
   </note>
+  <note>
+    <title>Modern checklist</title>
+    <content><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE en-note SYSTEM "http://xml.evernote.com/pub/enml2.dtd">
+<en-note><div>Release steps:</div><ul style="--en-todo:true;"><li style="--en-checked:true;">Tag the build</li><li style="--en-checked:false;">Write release notes</li><li>No explicit state</li><ul style="--en-todo:true;"><li style="--en-checked:false;">Nested sub-task</li></ul></ul><ul><li style="--en-checked:true;">Marked item in an unmarked list</li><li>Ordinary bullet</li></ul></en-note>]]></content>
+    <created>20230801T090000Z</created>
+    <updated>20230801T090000Z</updated>
+    <tag>release</tag>
+  </note>
 </en-export>

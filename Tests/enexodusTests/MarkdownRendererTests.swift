@@ -264,6 +264,55 @@ final class MarkdownRendererTests: XCTestCase {
         XCTAssertEqual(markdown("<div>a <en-todo checked=\"true\"/> b</div>"), "a \u{2611} b")
     }
 
+    /// Evernote's modern checklist encoding: the <ul> is marked, and each <li> carries its own
+    /// state. Unrelated to <en-todo>, and five times more common in a real corpus.
+    func testChecklistULBecomesTaskList() {
+        XCTAssertEqual(
+            markdown(
+                "<ul style=\"--en-todo:true;\">"
+                    + "<li style=\"--en-checked:true;\">done</li>"
+                    + "<li style=\"--en-checked:false;\">open</li>"
+                    + "</ul>"
+            ),
+            "- [x] done\n- [ ] open"
+        )
+    }
+
+    func testChecklistItemStateWinsWithoutTheListMarker() {
+        XCTAssertEqual(
+            markdown("<ul><li style=\"--en-checked:true;\">done</li><li>plain</li></ul>"),
+            "- [x] done\n- plain",
+            "an item's own state applies even when the list is unmarked"
+        )
+    }
+
+    func testChecklistMarkerMakesUnmarkedItemsUnchecked() {
+        XCTAssertEqual(
+            markdown("<ul style=\"--en-todo:true;\"><li>fresh row</li></ul>"),
+            "- [ ] fresh row"
+        )
+    }
+
+    /// Real notes nest a checklist under a checked parent, and Evernote writes the nested <ul>
+    /// as a sibling of the <li> rather than a child.
+    func testNestedChecklistsKeepTheirOwnState() {
+        XCTAssertEqual(
+            markdown(
+                "<ul style=\"--en-todo:true;\">"
+                    + "<li style=\"--en-checked:true;\">parent</li>"
+                    + "<ul style=\"--en-todo:true;\">"
+                    + "<li style=\"--en-checked:false;\">child</li>"
+                    + "</ul></ul>"
+            ),
+            "- [x] parent\n    - [ ] child"
+        )
+    }
+
+    func testOrdinaryListsAreUnaffectedByChecklistSupport() {
+        XCTAssertEqual(markdown("<ul><li>a</li><li>b</li></ul>"), "- a\n- b")
+        XCTAssertEqual(markdown("<ol><li>a</li><li>b</li></ol>"), "1. a\n2. b")
+    }
+
     func testEmptyListItemKeepsItsBullet() {
         XCTAssertEqual(markdown("<ul><li>a</li><li></li><li>c</li></ul>"), "- a\n-\n- c")
     }

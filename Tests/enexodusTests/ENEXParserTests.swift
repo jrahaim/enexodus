@@ -8,7 +8,7 @@ final class ENEXParserTests: XCTestCase {
     // MARK: Counts
 
     func testNoteCountsPerFixture() throws {
-        let expected = ["plain": 3, "todos": 3, "tables": 3, "media": 2, "hostile": 7]
+        let expected = ["plain": 3, "todos": 4, "tables": 3, "media": 2, "hostile": 7]
         for (fixture, count) in expected {
             let notes = try Fixtures.notes(in: fixture)
             XCTAssertEqual(notes.count, count, "note count for \(fixture).enex")

@@ -83,8 +83,8 @@ final class EndToEndTests: XCTestCase {
 
         XCTAssertTrue(report.ok, "verify reported: \(report.notebooks.flatMap(\.problems))")
         XCTAssertEqual(report.totals.notebooks, 5)
-        XCTAssertEqual(report.totals.enexNotes, 18)
-        XCTAssertEqual(report.totals.markdownFiles, 18)
+        XCTAssertEqual(report.totals.enexNotes, 19)
+        XCTAssertEqual(report.totals.markdownFiles, 19)
         XCTAssertEqual(report.totals.enexResources, 2)
         XCTAssertEqual(report.totals.attachmentFiles, 2)
         XCTAssertEqual(report.totals.enexMediaReferences, 3)

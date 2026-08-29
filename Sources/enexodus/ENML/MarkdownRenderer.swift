@@ -432,6 +432,7 @@ private final class RenderState {
     private func renderList(_ element: ElementAlias, ordered: Bool, listDepth: Int) -> [String] {
         var lines: [String] = []
         var number = Int(element["start"] ?? "") ?? 1
+        let checklist = RenderState.isChecklist(element)
 
         for child in element.children {
             guard case .element(let item) = child else { continue }
@@ -444,8 +445,10 @@ private final class RenderState {
                 continue
             }
 
-            let (marker, contentChildren) = listMarker(for: item, ordered: ordered, number: number)
-            if ordered, !isTodoItem(item) { number += 1 }
+            let (marker, contentChildren) = listMarker(
+                for: item, ordered: ordered, number: number, inChecklist: checklist
+            )
+            if ordered, !isTaskItem(item, inChecklist: checklist) { number += 1 }
             lines.append(contentsOf: renderListItem(contentChildren, marker: marker, listDepth: listDepth))
         }
 
@@ -453,15 +456,21 @@ private final class RenderState {
         return [lines.joined(separator: "\n")]
     }
 
-    /// Decides the item's bullet, consuming a leading `<en-todo>` when there is one.
+    /// Decides the item's bullet.
     ///
-    /// Per plan §4 WP-3.2, `<en-todo>` becomes a checkbox only when it leads a list item;
-    /// elsewhere it renders as an inline glyph.
+    /// Evernote has two unrelated checklist encodings and both appear in real exports:
+    /// the old `<en-todo/>` element, and — five times more common in one real corpus — a
+    /// `<ul style="--en-todo:true">` whose items carry `--en-checked:true|false`.
     private func listMarker(
         for item: ElementAlias,
         ordered: Bool,
-        number: Int
+        number: Int,
+        inChecklist: Bool
     ) -> (String, [ENMLNode]) {
+        if let checked = RenderState.checkboxState(for: item, inChecklist: inChecklist) {
+            return (checked ? "- [x] " : "- [ ] ", item.children)
+        }
+
         var children = item.children
         if let index = firstMeaningfulIndex(children),
             case .element(let candidate) = children[index],
@@ -474,7 +483,29 @@ private final class RenderState {
         return (ordered ? "\(number). " : "- ", children)
     }
 
-    private func isTodoItem(_ item: ElementAlias) -> Bool {
+    /// True when this `<ul>` is one of Evernote's checklists.
+    static func isChecklist(_ element: ENMLElement) -> Bool {
+        normalizedStyle(element).contains("--en-todo:true")
+    }
+
+    /// Checkbox state for a list item, or nil when it is an ordinary bullet.
+    ///
+    /// The item's own `--en-checked` wins; failing that, membership of a checklist makes it an
+    /// unchecked item, since Evernote omits the attribute on freshly added rows.
+    static func checkboxState(for item: ENMLElement, inChecklist: Bool) -> Bool? {
+        let style = normalizedStyle(item)
+        if style.contains("--en-checked:true") { return true }
+        if style.contains("--en-checked:false") { return false }
+        return inChecklist ? false : nil
+    }
+
+    private static func normalizedStyle(_ element: ENMLElement) -> String {
+        (element["style"] ?? "").replacingOccurrences(of: " ", with: "").lowercased()
+    }
+
+    /// Task items never consume an ordered-list number.
+    private func isTaskItem(_ item: ElementAlias, inChecklist: Bool) -> Bool {
+        if RenderState.checkboxState(for: item, inChecklist: inChecklist) != nil { return true }
         guard let index = firstMeaningfulIndex(item.children),
             case .element(let candidate) = item.children[index]
         else { return false }

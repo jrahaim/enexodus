@@ -50,8 +50,12 @@ Related consequences of that model:
 - Lines within a block are joined with a plain newline, which Obsidian renders as a line break.
   Strict CommonMark treats it as a soft break; the Phase 2 output-flavour toggle is where that
   becomes selectable.
-- `<en-todo>` leading *any* block container becomes `- [ ]` / `- [x]`, not only inside `<li>`.
-  `<div><en-todo/>text</div>` is the shape Evernote's own checklists use.
+- **Checklists.** Evernote has two unrelated encodings and both appear in real exports:
+  the old `<en-todo/>` element, and `<ul style="--en-todo:true">` whose items carry
+  `--en-checked:true|false`. In one real corpus the second was five times more common. Both
+  become GFM task lists (`- [ ]` / `- [x]`), including when nested. An `<en-todo>` leading *any*
+  block container counts, not only one inside `<li>` — `<div><en-todo/>text</div>` is a shape
+  Evernote's own checklists use.
 - A container whose text is entirely in a monospace font becomes a fenced code block, and
   consecutive such lines fuse into one fence. Older exports have no `--en-codeblock` marker —
   in one real 255-note export only 2 notes used it, versus 37 using monospace fonts.
