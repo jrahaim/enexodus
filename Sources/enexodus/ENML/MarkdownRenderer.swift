@@ -58,14 +58,28 @@ struct RenderResult {
 /// `HTMLFallback` rather than approximated, so text is never lost to a lossy mapping.
 struct MarkdownRenderer {
     var resources: ResourceIndex
+    var spacing: Spacing
 
-    init(resources: ResourceIndex = .empty) {
+    /// How to treat Evernote's `<div><br/></div>` spacer lines.
+    enum Spacing: String, CaseIterable, Sendable {
+        /// Reproduce every spacer as a blank line — what the note looked like in Evernote.
+        case faithful
+        /// Drop spacers in notes that use one after *every* line.
+        ///
+        /// A separator that appears everywhere separates nothing: it is a typing habit, not
+        /// structure. Notes that use spacers only at some boundaries are left alone, because
+        /// there the blank lines really are breaking up thoughts.
+        case tight
+    }
+
+    init(resources: ResourceIndex = .empty, spacing: Spacing = .faithful) {
         self.resources = resources
+        self.spacing = spacing
     }
 
     func render(_ root: ENMLElement) -> RenderResult {
         let state = RenderState(resources: resources)
-        let blocks = state.renderBlocks(root.children, listDepth: 0)
+        let blocks = state.renderDocument(root.children, spacing: spacing)
         return RenderResult(
             markdown: blocks.joined(separator: "\n\n"),
             warnings: state.warnings,
@@ -152,6 +166,59 @@ private final class RenderState {
 
     func renderBlocks(_ nodes: [ENMLNode], listDepth: Int) -> [String] {
         assemble(renderFragments(nodes, listDepth: listDepth))
+    }
+
+    /// Top-level entry: the spacing policy applies to the note as a whole, not to each nested
+    /// container, because "does this note double-space everything" is a note-level question.
+    func renderDocument(
+        _ nodes: [ENMLNode],
+        spacing: MarkdownRenderer.Spacing
+    ) -> [String] {
+        var fragments = renderFragments(nodes, listDepth: 0)
+        if spacing == .tight { fragments = RenderState.tighten(fragments) }
+        return assemble(fragments)
+    }
+
+    /// Drops single spacer lines when the note puts one after nearly every line.
+    ///
+    /// Runs of two or more spacers survive as a single blank line: those are emphatic breaks
+    /// even in a note that otherwise double-spaces everything.
+    static func tighten(_ fragments: [Fragment]) -> [Fragment] {
+        var lines = 0
+        var isolatedBreaks = 0
+        var runLength = 0
+        for fragment in fragments {
+            switch fragment {
+            case .paragraphBreak:
+                runLength += 1
+            default:
+                if runLength == 1 { isolatedBreaks += 1 }
+                runLength = 0
+                if case .line = fragment { lines += 1 }
+            }
+        }
+        if runLength == 1 { isolatedBreaks += 1 }
+
+        // Only when the habit is pervasive: at least five lines, and a lone spacer after at
+        // least half of them.
+        guard lines >= 5, isolatedBreaks * 2 >= lines else { return fragments }
+
+        var out: [Fragment] = []
+        var pendingBreaks = 0
+        func flushBreaks() {
+            if pendingBreaks >= 2 { out.append(.paragraphBreak) }
+            pendingBreaks = 0
+        }
+        for fragment in fragments {
+            if case .paragraphBreak = fragment {
+                pendingBreaks += 1
+            } else {
+                flushBreaks()
+                out.append(fragment)
+            }
+        }
+        flushBreaks()
+        return out
     }
 
     /// Joins adjacent fragments into blocks: runs of lines become paragraphs, runs of code
@@ -874,7 +941,9 @@ private final class RenderState {
         text
             .components(separatedBy: "\n")
             .map { line in
-                String(line.reversed().drop(while: { $0 == " " || $0 == "\t" }).reversed())
+                // Both ends: a stray leading space misaligns list markers, and four of them
+                // would turn the line into an indented code block.
+                line.trimmingCharacters(in: CharacterSet(charactersIn: " \t"))
             }
             .filter { !$0.isEmpty }
             .map(escapeLineStart)

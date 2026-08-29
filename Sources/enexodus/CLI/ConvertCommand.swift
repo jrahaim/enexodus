@@ -25,6 +25,16 @@ struct ConvertCommand: ParsableCommand {
     )
     var clean = false
 
+    @Option(
+        name: .customLong("spacing"),
+        help: ArgumentHelp(
+            "How to treat Evernote's blank-line spacers: 'faithful' keeps every one, "
+                + "'tight' drops them in notes that put a blank line after every single line.",
+            valueName: "faithful|tight"
+        )
+    )
+    var spacing: MarkdownRenderer.Spacing = .faithful
+
     @Flag(name: [.customShort("q"), .customLong("quiet")], help: "Print only the summary.")
     var quiet = false
 
@@ -59,7 +69,8 @@ struct ConvertCommand: ParsableCommand {
                 directoryName: location.directoryName,
                 notebookName: location.notebookName,
                 sourceFileName: location.fileURL.lastPathComponent,
-                clean: clean
+                clean: clean,
+                spacing: spacing
             )
 
             var notebookNotes = 0
@@ -118,3 +129,5 @@ struct ConvertCommand: ParsableCommand {
         print("run `enexodus verify --input \(input) --output \(output)` to confirm.")
     }
 }
+
+extension MarkdownRenderer.Spacing: ExpressibleByArgument {}

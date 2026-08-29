@@ -268,6 +268,58 @@ final class MarkdownRendererTests: XCTestCase {
         XCTAssertEqual(markdown("<ul><li>a</li><li></li><li>c</li></ul>"), "- a\n-\n- c")
     }
 
+    // MARK: Spacing policy
+
+    private func tight(_ body: String) -> String {
+        MarkdownRenderer(spacing: .tight).renderENML("<en-note>\(body)</en-note>").markdown
+    }
+
+    /// A separator that appears after every single line separates nothing — it is a typing
+    /// habit. `tight` drops those, while leaving alone notes that use blank lines selectively.
+    func testTightDropsUniformSpacersButKeepsSelectiveOnes() {
+        let uniform = (1...6).map { "<div>line \($0)</div><div><br/></div>" }.joined()
+        XCTAssertEqual(
+            tight(uniform),
+            "line 1\nline 2\nline 3\nline 4\nline 5\nline 6"
+        )
+
+        // Same note under the default policy keeps every spacer.
+        XCTAssertEqual(
+            markdown(uniform),
+            "line 1\n\nline 2\n\nline 3\n\nline 4\n\nline 5\n\nline 6"
+        )
+    }
+
+    func testTightLeavesSelectivelySpacedNotesAlone() {
+        let selective =
+            "<div>a</div><div>b</div><div>c</div><div><br/></div><div>d</div><div>e</div>"
+        XCTAssertEqual(tight(selective), "a\nb\nc\n\nd\ne")
+        XCTAssertEqual(tight(selective), markdown(selective), "policy must not alter this note")
+    }
+
+    /// Even in a note that double-spaces everything, a deliberate double gap is emphatic.
+    func testTightKeepsRunsOfTwoOrMoreSpacers() {
+        let body =
+            (1...6).map { "<div>line \($0)</div><div><br/></div>" }.joined()
+            + "<div><br/></div><div>after a bigger gap</div>"
+        XCTAssertEqual(
+            tight(body),
+            "line 1\nline 2\nline 3\nline 4\nline 5\nline 6\n\nafter a bigger gap"
+        )
+    }
+
+    func testTightNeverAppliesToShortNotes() {
+        let short = "<div>a</div><div><br/></div><div>b</div>"
+        XCTAssertEqual(tight(short), "a\n\nb")
+    }
+
+    func testLeadingWhitespaceIsTrimmedFromLines() {
+        // Four leading spaces would otherwise become an indented code block, and a single one
+        // misaligns the bullet in a list item.
+        XCTAssertEqual(markdown("<div>    indented prose</div>"), "indented prose")
+        XCTAssertEqual(markdown("<ul><li> spaced</li></ul>"), "- spaced")
+    }
+
     // MARK: Tables
 
     func testSimpleTableBecomesGFM() {

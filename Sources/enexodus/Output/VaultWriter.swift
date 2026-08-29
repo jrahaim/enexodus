@@ -60,6 +60,7 @@ final class VaultWriter {
     let notebookName: String
     let sourceFileName: String
     let directory: URL
+    let spacing: MarkdownRenderer.Spacing
 
     private let fileManager = FileManager.default
     private let attachmentsDirectory: URL
@@ -77,10 +78,12 @@ final class VaultWriter {
         directoryName: String,
         notebookName: String,
         sourceFileName: String,
-        clean: Bool
+        clean: Bool,
+        spacing: MarkdownRenderer.Spacing = .faithful
     ) throws {
         self.notebookName = notebookName
         self.sourceFileName = sourceFileName
+        self.spacing = spacing
         self.directory = outputRoot.appendingPathComponent(directoryName, isDirectory: true)
         self.attachmentsDirectory = directory.appendingPathComponent(
             VaultWriter.attachmentsDirectoryName,
@@ -96,7 +99,7 @@ final class VaultWriter {
     func write(_ note: Note) throws -> NoteOutcome {
         let (index, written) = try writeResources(of: note)
 
-        let renderer = MarkdownRenderer(resources: index)
+        let renderer = MarkdownRenderer(resources: index, spacing: spacing)
         let rendered = renderer.renderENML(note.content)
 
         let baseName = Slug.make(note.title, fallback: "untitled")
