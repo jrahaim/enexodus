@@ -177,3 +177,11 @@ against byte-for-byte.
 The non-negotiable test is losslessness: for every fixture note, the text content of the input
 ENML must appear in the output, in order, modulo whitespace. It ships with a negative control
 that proves the check can actually fail.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
+
+This project depends on [swift-argument-parser](https://github.com/apple/swift-argument-parser),
+which is Apache-2.0. When redistributing built binaries, include its license text alongside this
+one.
