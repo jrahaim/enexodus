@@ -120,7 +120,10 @@ Related consequences of that model:
 - **Code blocks.** A container whose text is entirely in a monospace font becomes a fenced code
   block, and consecutive such lines fuse into one fence. Older exports have no
   `--en-codeblock` marker — in one real 255-note export only 2 notes used it, versus 37 using
-  monospace fonts. A monospace run *within* a line becomes an inline code span instead.
+  monospace fonts. A monospace run *within* a line becomes an inline code span instead. The
+  family list is closed — inferring "code" from an arbitrary font would turn prose into code
+  blocks — and includes `Cordia New`, which is not monospace but is what real Evernote notes
+  use for code.
 - **Spacing (default `tight`).** Drops blank lines in notes that put one after *every* line — a
   separator that appears everywhere separates nothing, so it is a typing habit rather than
   structure. Notes that use blank lines selectively are left untouched, and a run of two or more
@@ -174,7 +177,7 @@ macOS 14+ or Linux. Swift 6.0+.
 swift test
 ```
 
-109 tests covering the parser, renderer, writer, verifier, and end-to-end conversion.
+112 tests covering the parser, renderer, writer, verifier, and end-to-end conversion.
 
 Fixtures live in `Tests/enexodusTests/Fixtures/` and are entirely synthetic — no real note
 content, by design. `Fixtures/expected/` holds the golden vault the end-to-end tests compare

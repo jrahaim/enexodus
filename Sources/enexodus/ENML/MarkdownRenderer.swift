@@ -870,20 +870,37 @@ private final class RenderState {
     /// where escaping would corrupt the content.
     private func plainText(_ element: ElementAlias) -> String {
         var out = ""
+        var lastWasBreak = false
         for child in element.children {
             switch child {
-            case .text(let text):
-                out += RenderState.normalizeSpaces(text)
+            case .text(let raw):
+                var text = RenderState.normalizeSpaces(raw)
+                // Evernote writes `<br/>` followed by a literal newline. Emitting both doubles
+                // every line break — invisible in prose, where blank lines are filtered, but it
+                // puts a blank line between every line of a code block. Only the newline is
+                // dropped: what follows it is indentation and must survive.
+                if lastWasBreak {
+                    if text.hasPrefix("\r\n") {
+                        text.removeFirst(2)
+                    } else if text.hasPrefix("\n") {
+                        text.removeFirst()
+                    }
+                }
+                lastWasBreak = false
+                out += text
             case .element(let inner):
                 let name = inner.name.lowercased()
                 if name == "br" {
+                    lastWasBreak = true
                     out += "\n"
                 } else if RenderState.blockElements.contains(name) {
+                    lastWasBreak = false
                     let nested = plainText(inner)
                     if !out.isEmpty, !out.hasSuffix("\n") { out += "\n" }
                     out += nested
                     out += "\n"
                 } else {
+                    lastWasBreak = false
                     out += plainText(inner)
                 }
             }
@@ -891,13 +908,19 @@ private final class RenderState {
         return out
     }
 
-    /// Monospace families that reliably mean "this is code" when Evernote has no code-block
-    /// marker. Deliberately a closed list: guessing from an arbitrary font would turn prose
-    /// into code blocks, which is worse than leaving code as prose.
-    private static let monospaceFamilies = [
+    /// Font families that mean "this is code" when Evernote left no code-block marker.
+    ///
+    /// Deliberately a closed list: inferring from an arbitrary font would turn prose into code
+    /// blocks, which is worse than leaving code as prose.
+    ///
+    /// `cordia new` is the odd one out — it is a Thai serif face, not monospace — but real
+    /// Evernote notes use it for code, and every occurrence across a 24-notebook corpus was
+    /// shell or Objective-C, never prose. Matched in full so "Concordia" cannot collide.
+    private static let codeFontFamilies = [
         "courier", "monaco", "consolas", "menlo", "monospace", "lucida console",
         "andale mono", "dejavu sans mono", "roboto mono", "source code pro", "sf mono",
         "ibm plex mono", "fira code", "inconsolata", "pt mono", "liberation mono",
+        "cordia new",
     ]
 
     /// A fenced code block when Evernote explicitly marked this container as one.
@@ -942,7 +965,7 @@ private final class RenderState {
         let face = (node["face"] ?? "").lowercased()
         let style = (node["style"] ?? "").lowercased()
         let declaresFamily = style.contains("font-family")
-        return monospaceFamilies.contains { family in
+        return codeFontFamilies.contains { family in
             face.contains(family) || (declaresFamily && style.contains(family))
         }
     }

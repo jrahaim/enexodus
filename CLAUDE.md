@@ -82,12 +82,16 @@ whole block model turns on it.
   a single day. Creation date is Darwin-only (Linux has no settable birth time), attachments
   inherit their note's dates, and stamping failure is deliberately non-fatal — a wrong
   timestamp must never cost a note.
+- **`<br/>` is often followed by a literal newline** in the source. Counting both doubles every
+  line break. Invisible in prose (blank lines get filtered) but it puts a blank line between
+  every line of a code block, where raw text is preserved. `plainText` drops the newline only,
+  never the indentation after it.
 - **`<div>` is a line, not a paragraph.** Getting this backwards double-spaces every note and
   discards the author's real blank lines. This was the single biggest output-quality bug.
 
 ## Testing
 
-`swift test` — 109 tests. Golden trees in `Tests/enexodusTests/Fixtures/expected/` are compared
+`swift test` — 112 tests. Golden trees in `Tests/enexodusTests/Fixtures/expected/` are compared
 byte-for-byte, so any intentional rendering change means regenerating them:
 
 ```bash
@@ -109,8 +113,9 @@ splitting out a library target, which changes the layout in the plan.
 
 ## Open items
 
-- `Cordia New` and other non-standard fonts used for code are not detected — only a closed list
-  of known monospace families is. Widening it risks turning prose into code blocks.
+- The code-font list (`RenderState.codeFontFamilies`) is closed on purpose. Widening it risks
+  turning prose into code blocks. `cordia new` is in it despite not being monospace, because
+  every occurrence across a real 24-notebook corpus was shell or Objective-C.
 - Notebook *stacks* are unrecoverable; ENEX does not record them.
 - Phase 2 is untouched: no `--config`, no `--flat` layout, no CommonMark/Obsidian output
   toggle, no CI matrix, no prebuilt binaries.

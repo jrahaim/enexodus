@@ -190,6 +190,42 @@ final class MarkdownRendererTests: XCTestCase {
         )
     }
 
+    /// Cordia New is a Thai serif face, not monospace, but real Evernote notes use it for code.
+    /// Every occurrence in a 24-notebook corpus was shell or Objective-C, never prose.
+    /// Evernote writes `<br/>` followed by a literal newline. Counting both puts a blank line
+    /// between every line of a code block.
+    func testBreakFollowedByLiteralNewlineIsNotDoubled() {
+        XCTAssertEqual(
+            markdown("<pre>one<br/>\ntwo<br/>\nthree</pre>"),
+            "```\none\ntwo\nthree\n```"
+        )
+        // A deliberate double break still yields one blank line.
+        XCTAssertEqual(
+            markdown("<pre>one<br/><br/>\ntwo</pre>"),
+            "```\none\n\ntwo\n```"
+        )
+        // Indentation after the newline must survive.
+        XCTAssertEqual(
+            markdown("<pre>if x:<br/>\n    body</pre>"),
+            "```\nif x:\n    body\n```"
+        )
+    }
+
+    func testCordiaNewIsTreatedAsACodeFont() {
+        XCTAssertEqual(
+            markdown("<div><font face=\"'Cordia New'\">#!/bin/bash<br/>exit 0</font></div>"),
+            "```\n#!/bin/bash\nexit 0\n```"
+        )
+    }
+
+    /// The family is matched in full, so a merely similar name must not collide.
+    func testSimilarFontNameDoesNotMatchCordia() {
+        XCTAssertEqual(
+            markdown("<div><font face=\"Concordia\">just prose<br/>more prose</font></div>"),
+            "just prose\nmore prose"
+        )
+    }
+
     func testMonospaceDetectionDoesNotSwallowProse() {
         XCTAssertEqual(
             markdown("<div><font face=\"Helvetica\">just prose<br/>more prose</font></div>"),
