@@ -83,6 +83,12 @@ exports into the same vault is the normal case.
 Each note gets YAML frontmatter — `title`, `created`, `updated`, `tags`, `source-url` when
 present, `notebook`, `enex-source` — followed by the rendered body.
 
+Written files also carry the note's own timestamps: modification date from `updated`, and on
+macOS creation date from `created`. Without this a whole vault sorts as a single day in Finder,
+`ls -lt` and Obsidian. Taking them from the note rather than the clock also means a re-run
+reproduces them exactly. Linux has no settable birth time, so only the modification date is
+applied there. Attachments inherit their note's dates, since ENEX resources carry none.
+
 Attachments keep their original `<file-name>` when the export has one, otherwise they are named
 from the first 8 hex digits of the resource MD5 plus an extension derived from the MIME type.
 Identical bytes are written once and linked from every note that references them. Resources that

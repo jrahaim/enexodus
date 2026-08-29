@@ -149,10 +149,9 @@ final class VaultWriter {
         let body = rendered.markdown.trimmingCharacters(in: .whitespacesAndNewlines)
         let document = body.isEmpty ? "\(frontmatter)\n" : "\(frontmatter)\n\n\(body)\n"
 
-        try Data(document.utf8).write(
-            to: directory.appendingPathComponent(fileName),
-            options: .atomic
-        )
+        let noteURL = directory.appendingPathComponent(fileName)
+        try Data(document.utf8).write(to: noteURL, options: .atomic)
+        VaultWriter.applyTimestamps(to: noteURL, created: note.created, updated: note.updated)
         notesWritten += 1
 
         var warnings = rendered.warnings
@@ -191,9 +190,11 @@ final class VaultWriter {
                 attachmentNameByHash[resource.md5] = fileName
 
                 try ensureAttachmentsDirectory()
-                try resource.data.write(
-                    to: attachmentsDirectory.appendingPathComponent(fileName),
-                    options: .atomic
+                let attachmentURL = attachmentsDirectory.appendingPathComponent(fileName)
+                try resource.data.write(to: attachmentURL, options: .atomic)
+                // A resource has no timestamp of its own, so it inherits the note's.
+                VaultWriter.applyTimestamps(
+                    to: attachmentURL, created: note.created, updated: note.updated
                 )
                 written.append(fileName)
             }
@@ -206,6 +207,23 @@ final class VaultWriter {
         }
 
         return (ResourceIndex(byHash: index), written)
+    }
+
+    /// Stamps a written file with the note's own dates.
+    ///
+    /// Without this every file carries the moment of conversion, so 214 notes all sort as the
+    /// same day in Finder, `ls -lt` and Obsidian. Deriving the timestamps from the note is also
+    /// *more* deterministic than the wall-clock value they would otherwise get.
+    ///
+    /// Modification date is portable. Creation date is Darwin-only — Linux has no settable
+    /// birth time — so it is attempted and ignored if unsupported. Failure is never fatal: a
+    /// wrong timestamp must not cost you the note.
+    static func applyTimestamps(to url: URL, created: Date?, updated: Date?) {
+        var attributes: [FileAttributeKey: Any] = [:]
+        if let modified = updated ?? created { attributes[.modificationDate] = modified }
+        if let born = created ?? updated { attributes[.creationDate] = born }
+        guard !attributes.isEmpty else { return }
+        try? FileManager.default.setAttributes(attributes, ofItemAtPath: url.path)
     }
 
     private func ensureAttachmentsDirectory() throws {

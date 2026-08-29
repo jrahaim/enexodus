@@ -209,6 +209,71 @@ final class VaultWriterTests: XCTestCase {
         XCTAssertTrue(Verifier.hasEmptyBody(text))
     }
 
+    // MARK: File timestamps
+
+    /// Without this every file carries the conversion time, so a whole vault sorts as one day
+    /// in Finder and Obsidian.
+    func testWrittenFilesCarryTheNotesOwnDates() throws {
+        let output = try makeTemporaryDirectory(self)
+        _ = try write("plain", into: output)
+
+        let url = output.appendingPathComponent("plain/Meeting notes.md")
+        let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+        let modified = try XCTUnwrap(attributes[.modificationDate] as? Date)
+        XCTAssertEqual(ENEXDate.iso8601(modified), "2023-11-19T09:02:00Z", "mtime = note updated")
+
+        #if os(macOS)
+            let created = try XCTUnwrap(attributes[.creationDate] as? Date)
+            XCTAssertEqual(ENEXDate.iso8601(created), "2019-04-02T14:31:00Z", "birth = note created")
+        #endif
+    }
+
+    func testAttachmentsInheritTheirNotesDates() throws {
+        let output = try makeTemporaryDirectory(self)
+        _ = try write("media", into: output)
+
+        let url = output.appendingPathComponent(
+            "media/\(VaultWriter.attachmentsDirectoryName)/diagram.png"
+        )
+        let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+        let modified = try XCTUnwrap(attributes[.modificationDate] as? Date)
+        XCTAssertEqual(ENEXDate.iso8601(modified), "2023-02-10T12:00:00Z")
+    }
+
+    /// Timestamps come from the note, not the clock, so a re-run reproduces them exactly.
+    func testTimestampsAreReproducibleAcrossRuns() throws {
+        let first = try makeTemporaryDirectory(self)
+        let second = try makeTemporaryDirectory(self)
+        _ = try write("plain", into: first)
+        _ = try write("plain", into: second)
+
+        for name in ["Meeting notes.md", "Nested lists.md"] {
+            let a = try FileManager.default.attributesOfItem(
+                atPath: first.appendingPathComponent("plain/\(name)").path)
+            let b = try FileManager.default.attributesOfItem(
+                atPath: second.appendingPathComponent("plain/\(name)").path)
+            XCTAssertEqual(a[.modificationDate] as? Date, b[.modificationDate] as? Date, name)
+        }
+    }
+
+    /// A note with no dates must still be written; only the stamping is skipped.
+    func testNoteWithoutDatesStillWrites() throws {
+        let output = try makeTemporaryDirectory(self)
+        let writer = try VaultWriter(
+            outputRoot: output, directoryName: "n", notebookName: "n", clean: false
+        )
+        let note = Note(
+            title: "Undated", content: "<en-note><div>body</div></en-note>",
+            created: nil, updated: nil, tags: [], attributes: [:], resources: []
+        )
+        let outcome = try writer.write(note, sourceFile: "n.enex")
+        XCTAssertEqual(outcome.fileName, "Undated.md")
+        XCTAssertTrue(
+            FileManager.default.fileExists(
+                atPath: output.appendingPathComponent("n/Undated.md").path)
+        )
+    }
+
     func testCleanRemovesStaleFiles() throws {
         let output = try makeTemporaryDirectory(self)
         _ = try write("plain", into: output)
