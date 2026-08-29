@@ -4,7 +4,14 @@ import Foundation
 struct ConvertCommand: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "convert",
-        abstract: "Convert a directory of .enex files into a folder-per-notebook Markdown vault."
+        abstract: "Convert .enex exports into a folder-per-notebook Markdown vault.",
+        discussion: """
+            Every notebook becomes a subfolder of --output, with its attachments in \
+            _attachments/, so converting several exports into the same vault is the normal case.
+
+            Re-running is safe: output depends only on the ENEX content and note order, so a \
+            second run over the same vault produces byte-identical files.
+            """
     )
 
     @Option(

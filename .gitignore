@@ -1,4 +1,40 @@
+# Build artifacts
 .build/
 .swiftpm/
+.index-build/
+DerivedData/
 *.xcodeproj
+*.xcworkspace
+xcuserdata/
+
+# macOS
 .DS_Store
+
+# Local tool config (machine-specific; .claude/settings.json is shared and may be committed)
+.claude/settings.local.json
+
+# ---------------------------------------------------------------------------
+# Real note data must never enter this repo.
+#
+# Evernote exports and converted vaults contain personal content, and in at
+# least one real notebook, plaintext credentials. Git history is forever, so
+# this is a hard guard rather than a convention. The synthetic test fixtures are
+# the only .enex files that belong here.
+# ---------------------------------------------------------------------------
+*.enex
+!Tests/enexodusTests/Fixtures/*.enex
+
+# Converted vaults, if someone points --output at the repo
+/Vault/
+/vault/
+/out/
+/output/
+/EvernoteVault/
+/*-markdown/
+
+# Secrets
+.env
+.env.*
+*.pem
+*.p12
+.netrc

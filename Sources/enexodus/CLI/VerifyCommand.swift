@@ -7,7 +7,10 @@ struct VerifyCommand: ParsableCommand {
         abstract: "Check a converted vault against the ENEX export it came from.",
         discussion: """
             Counts are computed twice by independent paths — one re-parses the ENEX, the other \
-            reads only the files on disk — and compared. Exits non-zero on any mismatch.
+            reads only the files on disk — and compared. Exits non-zero on any mismatch, so it \
+            works as a CI or pre-commit gate.
+
+            Pass the same --input values used for the conversion.
             """
     )
 
