@@ -120,11 +120,12 @@ final class VaultWriterTests: XCTestCase {
             outputRoot: output,
             directoryName: fixture,
             notebookName: fixture,
-            sourceFileName: "\(fixture).enex",
             clean: false
         )
         var outcomes: [NoteOutcome] = []
-        try ENEXParser.parse(fileURL: Fixtures.url(fixture)) { outcomes.append(try writer.write($0)) }
+        try ENEXParser.parse(fileURL: Fixtures.url(fixture)) {
+            outcomes.append(try writer.write($0, sourceFile: "\(fixture).enex"))
+        }
         return outcomes
     }
 
@@ -169,8 +170,7 @@ final class VaultWriterTests: XCTestCase {
     func testIdenticalResourcesAreWrittenOnce() throws {
         let output = try makeTemporaryDirectory(self)
         let writer = try VaultWriter(
-            outputRoot: output, directoryName: "n", notebookName: "n",
-            sourceFileName: "n.enex", clean: false
+            outputRoot: output, directoryName: "n", notebookName: "n", clean: false
         )
         let bytes = Data("same bytes".utf8)
         let resource = Resource(
@@ -182,7 +182,7 @@ final class VaultWriterTests: XCTestCase {
             created: nil, updated: nil, tags: [], attributes: [:],
             resources: [resource, resource]
         )
-        let outcome = try writer.write(note)
+        let outcome = try writer.write(note, sourceFile: "n.enex")
         XCTAssertEqual(outcome.attachmentsWritten, ["shared.png"])
     }
 
@@ -217,10 +217,11 @@ final class VaultWriterTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: stale.path))
 
         let writer = try VaultWriter(
-            outputRoot: output, directoryName: "plain", notebookName: "plain",
-            sourceFileName: "plain.enex", clean: true
+            outputRoot: output, directoryName: "plain", notebookName: "plain", clean: true
         )
-        try ENEXParser.parse(fileURL: Fixtures.url("plain")) { _ = try writer.write($0) }
+        try ENEXParser.parse(fileURL: Fixtures.url("plain")) {
+            _ = try writer.write($0, sourceFile: "plain.enex")
+        }
         XCTAssertFalse(FileManager.default.fileExists(atPath: stale.path))
     }
 
@@ -229,7 +230,7 @@ final class VaultWriterTests: XCTestCase {
     /// A single .enex file is one notebook. Requiring a directory forced callers to build a
     /// throwaway folder just to convert one export.
     func testSingleFileInputResolvesToOneNotebook() throws {
-        let locations = try VaultWriter.locations(inInputDirectory: Fixtures.url("plain"))
+        let locations = try VaultWriter.locations(forInputs: [Fixtures.url("plain")])
         XCTAssertEqual(locations.count, 1)
         XCTAssertEqual(locations[0].notebookName, "plain")
         XCTAssertEqual(locations[0].directoryName, "plain")
@@ -239,20 +240,76 @@ final class VaultWriterTests: XCTestCase {
         let directory = try makeTemporaryDirectory(self)
         let stray = directory.appendingPathComponent("notes.txt")
         try Data("not an export".utf8).write(to: stray)
-        XCTAssertTrue(try VaultWriter.locations(inInputDirectory: stray).isEmpty)
+        XCTAssertTrue(try VaultWriter.locations(forInputs: [stray]).isEmpty)
     }
 
     func testMissingInputThrows() {
         let missing = URL(fileURLWithPath: "/nonexistent/nowhere.enex")
-        XCTAssertThrowsError(try VaultWriter.locations(inInputDirectory: missing))
+        XCTAssertThrowsError(try VaultWriter.locations(forInputs: [missing]))
+    }
+
+    /// Evernote caps an export at 100 notes per file and suffixes the overflow, so one
+    /// notebook can arrive as `My Notes.enex` + `My Notes (1).enex` + `My Notes (2).enex`.
+    /// Those belong in one folder, not three.
+    func testSplitExportFilesMergeIntoOneNotebook() throws {
+        let directory = try makeTemporaryDirectory(self)
+        let source = try Data(contentsOf: Fixtures.url("plain"))
+        for name in ["My Notes.enex", "My Notes (1).enex", "My Notes (2).enex"] {
+            try source.write(to: directory.appendingPathComponent(name))
+        }
+
+        let merged = try VaultWriter.locations(forInputs: [directory])
+        XCTAssertEqual(merged.count, 1)
+        XCTAssertEqual(merged[0].notebookName, "My Notes")
+        XCTAssertEqual(merged[0].fileURLs.count, 3)
+
+        let unmerged = try VaultWriter.locations(forInputs: [directory], mergeSplitFiles: false)
+        XCTAssertEqual(unmerged.count, 3)
+    }
+
+    func testSplitSuffixStrippingOnlyMatchesTrailingIntegers() {
+        XCTAssertEqual(VaultWriter.splitExportBaseName("My Notes (2)"), "My Notes")
+        XCTAssertEqual(VaultWriter.splitExportBaseName("My Notes (12)"), "My Notes")
+        XCTAssertEqual(VaultWriter.splitExportBaseName("My Notes"), "My Notes")
+        // A notebook genuinely named this way must survive untouched.
+        XCTAssertEqual(VaultWriter.splitExportBaseName("Recipes (old)"), "Recipes (old)")
+        XCTAssertEqual(VaultWriter.splitExportBaseName("Notes (2) draft"), "Notes (2) draft")
+        XCTAssertEqual(VaultWriter.splitExportBaseName("(3)"), "(3)")
+    }
+
+    func testMergedNotebookDisambiguatesNoteTitlesAcrossFiles() throws {
+        let input = try makeTemporaryDirectory(self)
+        let output = try makeTemporaryDirectory(self)
+        let source = try Data(contentsOf: Fixtures.url("plain"))
+        for name in ["Split.enex", "Split (1).enex"] {
+            try source.write(to: input.appendingPathComponent(name))
+        }
+
+        let location = try XCTUnwrap(try VaultWriter.locations(forInputs: [input]).first)
+        let writer = try VaultWriter(
+            outputRoot: output,
+            directoryName: location.directoryName,
+            notebookName: location.notebookName,
+            clean: false
+        )
+        var names: [String] = []
+        for fileURL in location.fileURLs {
+            try ENEXParser.parse(fileURL: fileURL) {
+                names.append(try writer.write($0, sourceFile: fileURL.lastPathComponent).fileName)
+            }
+        }
+        XCTAssertEqual(names.count, 6, "both files' notes must be written")
+        XCTAssertEqual(Set(names).count, 6, "duplicate titles across files must not overwrite")
+        XCTAssertTrue(names.contains("Meeting notes.md"))
+        XCTAssertTrue(names.contains("Meeting notes-2.md"))
     }
 
     func testNotebookDirectoryNamesComeFromFilenames() throws {
-        let locations = try VaultWriter.locations(inInputDirectory: Fixtures.directory)
+        let locations = try VaultWriter.locations(forInputs: [Fixtures.directory])
         XCTAssertEqual(locations.map(\.notebookName), Fixtures.names)
         XCTAssertEqual(locations.map(\.directoryName), Fixtures.names)
         XCTAssertTrue(
-            locations.allSatisfy { $0.fileURL.pathExtension == "enex" },
+            locations.allSatisfy { $0.fileURLs.allSatisfy { $0.pathExtension == "enex" } },
             "the expected/ subdirectory must not be treated as a notebook"
         )
     }

@@ -16,7 +16,10 @@ struct NoteOutcome {
 /// ENEX carries no notebook name, so the export convention — one file per notebook, filename is
 /// the notebook name (plan §2) — is the only source of it.
 struct NotebookLocation {
-    var fileURL: URL
+    /// Usually one file. Evernote caps an export at 100 notes per file and suffixes the
+    /// overflow — `My Notes.enex`, `My Notes (1).enex`, `My Notes (2).enex` — so one notebook
+    /// can arrive as several files that must land in a single folder.
+    var fileURLs: [URL]
     var notebookName: String
     var directoryName: String
 }
@@ -30,47 +33,70 @@ final class VaultWriter {
 
     static let attachmentsDirectoryName = "_attachments"
 
-    /// Resolves the input path — a directory of `.enex` files, or a single `.enex` file — into
-    /// the notebooks to convert, each with its vault directory name.
+    /// Resolves input paths — `.enex` files, directories of them, or a mix — into the notebooks
+    /// to convert, each with its vault directory name.
     ///
     /// Sorted by filename and disambiguated in that order, so both `convert` and `verify`
     /// derive identical directory names without sharing state.
-    static func locations(inInputDirectory input: URL) throws -> [NotebookLocation] {
+    static func locations(forInputs inputs: [URL], mergeSplitFiles: Bool = true) throws
+        -> [NotebookLocation]
+    {
         let manager = FileManager.default
-        var isDirectory: ObjCBool = false
-        guard manager.fileExists(atPath: input.path, isDirectory: &isDirectory) else {
-            throw CocoaError(.fileNoSuchFile, userInfo: [NSFilePathErrorKey: input.path])
-        }
+        var enexFiles: [URL] = []
 
-        let enexFiles: [URL]
-        if isDirectory.boolValue {
-            enexFiles = try manager.contentsOfDirectory(
-                at: input,
-                includingPropertiesForKeys: nil,
-                options: [.skipsHiddenFiles]
-            )
-            .filter { $0.pathExtension.lowercased() == "enex" }
-            .sorted { $0.lastPathComponent < $1.lastPathComponent }
-        } else {
-            // A single .enex file is one notebook — the common case when checking one export.
-            enexFiles = input.pathExtension.lowercased() == "enex" ? [input] : []
+        for input in inputs {
+            var isDirectory: ObjCBool = false
+            guard manager.fileExists(atPath: input.path, isDirectory: &isDirectory) else {
+                throw CocoaError(.fileNoSuchFile, userInfo: [NSFilePathErrorKey: input.path])
+            }
+            if isDirectory.boolValue {
+                enexFiles += try manager.contentsOfDirectory(
+                    at: input,
+                    includingPropertiesForKeys: nil,
+                    options: [.skipsHiddenFiles]
+                )
+                .filter { $0.pathExtension.lowercased() == "enex" }
+            } else if input.pathExtension.lowercased() == "enex" {
+                enexFiles.append(input)
+            }
+        }
+        enexFiles.sort { $0.lastPathComponent < $1.lastPathComponent }
+
+        // Group by notebook name, folding Evernote's split-export suffix when asked.
+        var order: [String] = []
+        var grouped: [String: [URL]] = [:]
+        for url in enexFiles {
+            let stem = url.deletingPathExtension().lastPathComponent
+            let name = mergeSplitFiles ? splitExportBaseName(stem) : stem
+            if grouped[name] == nil { order.append(name) }
+            grouped[name, default: []].append(url)
         }
 
         var used: Set<String> = []
-        return enexFiles.map { url in
-            let notebookName = url.deletingPathExtension().lastPathComponent
-            let base = Slug.make(notebookName, fallback: "notebook")
+        return order.map { name in
+            let base = Slug.make(name, fallback: "notebook")
             let directoryName = Slug.disambiguate(base, extension: "", used: &used)
             return NotebookLocation(
-                fileURL: url,
-                notebookName: notebookName,
+                fileURLs: grouped[name] ?? [],
+                notebookName: name,
                 directoryName: directoryName
             )
         }
     }
 
+    /// Strips Evernote's split-export suffix: `My Notes (2)` -> `My Notes`.
+    ///
+    /// Only a parenthesised integer at the very end counts, so a notebook genuinely named
+    /// `Recipes (old)` is left alone.
+    static func splitExportBaseName(_ stem: String) -> String {
+        guard stem.hasSuffix(")"), let open = stem.lastIndex(of: "(") else { return stem }
+        let inside = stem[stem.index(after: open)..<stem.index(before: stem.endIndex)]
+        guard !inside.isEmpty, inside.allSatisfy(\.isNumber) else { return stem }
+        let base = stem[stem.startIndex..<open].trimmingCharacters(in: .whitespaces)
+        return base.isEmpty ? stem : base
+    }
+
     let notebookName: String
-    let sourceFileName: String
     let directory: URL
     let spacing: MarkdownRenderer.Spacing
 
@@ -89,12 +115,10 @@ final class VaultWriter {
         outputRoot: URL,
         directoryName: String,
         notebookName: String,
-        sourceFileName: String,
         clean: Bool,
         spacing: MarkdownRenderer.Spacing = .tight
     ) throws {
         self.notebookName = notebookName
-        self.sourceFileName = sourceFileName
         self.spacing = spacing
         self.directory = outputRoot.appendingPathComponent(directoryName, isDirectory: true)
         self.attachmentsDirectory = directory.appendingPathComponent(
@@ -108,7 +132,7 @@ final class VaultWriter {
         try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
     }
 
-    func write(_ note: Note) throws -> NoteOutcome {
+    func write(_ note: Note, sourceFile: String) throws -> NoteOutcome {
         let (index, written) = try writeResources(of: note)
 
         let renderer = MarkdownRenderer(resources: index, spacing: spacing)
@@ -120,7 +144,7 @@ final class VaultWriter {
         let frontmatter = Frontmatter.render(
             note: note,
             notebook: notebookName,
-            sourceFile: sourceFileName
+            sourceFile: sourceFile
         )
         let body = rendered.markdown.trimmingCharacters(in: .whitespacesAndNewlines)
         let document = body.isEmpty ? "\(frontmatter)\n" : "\(frontmatter)\n\n\(body)\n"

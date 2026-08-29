@@ -9,9 +9,12 @@ struct ConvertCommand: ParsableCommand {
 
     @Option(
         name: [.customShort("i"), .customLong("input")],
-        help: ArgumentHelp("A .enex file, or a directory of them.", valueName: "enex-path")
+        help: ArgumentHelp(
+            "A .enex file or a directory of them. Repeat to pass several.",
+            valueName: "enex-path"
+        )
     )
-    var input: String
+    var input: [String] = []
 
     @Option(
         name: [.customShort("o"), .customLong("output")],
@@ -40,17 +43,18 @@ struct ConvertCommand: ParsableCommand {
 
     func run() throws {
         let fileManager = FileManager.default
-        let inputDirectory = URL(fileURLWithPath: input)
+        guard !input.isEmpty else { throw ValidationError("at least one --input is required") }
+        let inputs = input.map { URL(fileURLWithPath: $0) }
         let outputDirectory = URL(fileURLWithPath: output, isDirectory: true)
 
-        guard fileManager.fileExists(atPath: inputDirectory.path) else {
-            throw ValidationError("no such file or directory: \(inputDirectory.path)")
+        for url in inputs where !fileManager.fileExists(atPath: url.path) {
+            throw ValidationError("no such file or directory: \(url.path)")
         }
         try fileManager.createDirectory(at: outputDirectory, withIntermediateDirectories: true)
 
-        let locations = try VaultWriter.locations(inInputDirectory: inputDirectory)
+        let locations = try VaultWriter.locations(forInputs: inputs)
         guard !locations.isEmpty else {
-            throw ValidationError("no .enex files found at \(inputDirectory.path)")
+            throw ValidationError("no .enex files found at \(input.joined(separator: ", "))")
         }
 
         var totalNotes = 0
@@ -65,7 +69,6 @@ struct ConvertCommand: ParsableCommand {
                 outputRoot: outputDirectory,
                 directoryName: location.directoryName,
                 notebookName: location.notebookName,
-                sourceFileName: location.fileURL.lastPathComponent,
                 clean: clean,
                 spacing: spacing
             )
@@ -77,8 +80,10 @@ struct ConvertCommand: ParsableCommand {
             var notebookEmpty = 0
             var notebookParseFailures = 0
 
-            try ENEXParser.parse(fileURL: location.fileURL) { note in
-                let outcome = try writer.write(note)
+            for fileURL in location.fileURLs {
+                let sourceFile = fileURL.lastPathComponent
+                try ENEXParser.parse(fileURL: fileURL) { note in
+                let outcome = try writer.write(note, sourceFile: sourceFile)
                 notebookNotes += 1
                 notebookAttachments += outcome.attachmentsWritten.count
                 notebookOrphans += outcome.orphanMediaReferences
@@ -95,11 +100,14 @@ struct ConvertCommand: ParsableCommand {
                         )
                     }
                 }
+                }
             }
 
             if !quiet {
+                let from = location.fileURLs.count > 1
+                    ? " (merged from \(location.fileURLs.count) files)" : ""
                 print(
-                    "\(location.notebookName): \(notebookNotes) notes, "
+                    "\(location.notebookName)\(from): \(notebookNotes) notes, "
                         + "\(notebookAttachments) attachments, "
                         + "\(notebookFallbacks) html-fallback, "
                         + "\(notebookOrphans) orphan media, "
@@ -123,7 +131,8 @@ struct ConvertCommand: ParsableCommand {
                 + "orphan media: \(totalOrphans)  empty notes: \(totalEmpty)  "
                 + "unparseable ENML: \(parseFailures)"
         )
-        print("run `enexodus verify --input \(input) --output \(output)` to confirm.")
+        let inputArgs = input.map { "--input \"\($0)\"" }.joined(separator: " ")
+        print("run `enexodus verify \(inputArgs) --output \(output)` to confirm.")
     }
 }
 

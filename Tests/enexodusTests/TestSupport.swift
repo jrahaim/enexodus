@@ -41,16 +41,16 @@ func makeTemporaryDirectory(_ testCase: XCTestCase) throws -> URL {
 
 /// Converts a whole fixture directory into `output`, the same way the CLI does.
 func convertFixtures(into output: URL, clean: Bool = false) throws {
-    for location in try VaultWriter.locations(inInputDirectory: Fixtures.directory) {
+    for location in try VaultWriter.locations(forInputs: [Fixtures.directory]) {
         let writer = try VaultWriter(
             outputRoot: output,
             directoryName: location.directoryName,
             notebookName: location.notebookName,
-            sourceFileName: location.fileURL.lastPathComponent,
             clean: clean
         )
-        try ENEXParser.parse(fileURL: location.fileURL) { note in
-            _ = try writer.write(note)
+        for fileURL in location.fileURLs {
+            let sourceFile = fileURL.lastPathComponent
+            try ENEXParser.parse(fileURL: fileURL) { _ = try writer.write($0, sourceFile: sourceFile) }
         }
     }
 }

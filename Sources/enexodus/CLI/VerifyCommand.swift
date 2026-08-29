@@ -13,9 +13,12 @@ struct VerifyCommand: ParsableCommand {
 
     @Option(
         name: [.customShort("i"), .customLong("input")],
-        help: ArgumentHelp("The .enex file or directory the vault came from.", valueName: "enex-path")
+        help: ArgumentHelp(
+            "The .enex file or directory the vault came from. Repeat to pass several.",
+            valueName: "enex-path"
+        )
     )
-    var input: String
+    var input: [String] = []
 
     @Option(
         name: [.customShort("o"), .customLong("output")],
@@ -27,17 +30,15 @@ struct VerifyCommand: ParsableCommand {
     var json = false
 
     func run() throws {
-        let inputDirectory = URL(fileURLWithPath: input)
+        guard !input.isEmpty else { throw ValidationError("at least one --input is required") }
+        let inputs = input.map { URL(fileURLWithPath: $0) }
         let outputDirectory = URL(fileURLWithPath: output, isDirectory: true)
 
-        guard FileManager.default.fileExists(atPath: inputDirectory.path) else {
-            throw ValidationError("no such file or directory: \(inputDirectory.path)")
+        for url in inputs where !FileManager.default.fileExists(atPath: url.path) {
+            throw ValidationError("no such file or directory: \(url.path)")
         }
 
-        let report = try Verifier(
-            inputDirectory: inputDirectory,
-            outputDirectory: outputDirectory
-        ).run()
+        let report = try Verifier(inputs: inputs, outputDirectory: outputDirectory).run()
 
         if json {
             let encoder = JSONEncoder()

@@ -77,9 +77,7 @@ final class EndToEndTests: XCTestCase {
         let output = try makeTemporaryDirectory(self)
         try convertFixtures(into: output)
 
-        let report = try Verifier(
-            inputDirectory: Fixtures.directory, outputDirectory: output
-        ).run()
+        let report = try Verifier(inputs: [Fixtures.directory], outputDirectory: output).run()
 
         XCTAssertTrue(report.ok, "verify reported: \(report.notebooks.flatMap(\.problems))")
         XCTAssertEqual(report.totals.notebooks, 5)
@@ -99,9 +97,7 @@ final class EndToEndTests: XCTestCase {
     func testVerifyVaultCountsAgreeWithAnIndependentFilesystemWalk() throws {
         let output = try makeTemporaryDirectory(self)
         try convertFixtures(into: output)
-        let report = try Verifier(
-            inputDirectory: Fixtures.directory, outputDirectory: output
-        ).run()
+        let report = try Verifier(inputs: [Fixtures.directory], outputDirectory: output).run()
 
         var markdownFiles = 0
         var attachmentFiles = 0
@@ -123,9 +119,7 @@ final class EndToEndTests: XCTestCase {
             at: output.appendingPathComponent("plain/Meeting notes.md")
         )
 
-        let report = try Verifier(
-            inputDirectory: Fixtures.directory, outputDirectory: output
-        ).run()
+        let report = try Verifier(inputs: [Fixtures.directory], outputDirectory: output).run()
 
         XCTAssertFalse(report.ok)
         let plain = try XCTUnwrap(report.notebooks.first { $0.notebook == "plain" })
@@ -147,9 +141,7 @@ final class EndToEndTests: XCTestCase {
             )
         )
 
-        let report = try Verifier(
-            inputDirectory: Fixtures.directory, outputDirectory: output
-        ).run()
+        let report = try Verifier(inputs: [Fixtures.directory], outputDirectory: output).run()
 
         XCTAssertFalse(report.ok)
         let media = try XCTUnwrap(report.notebooks.first { $0.notebook == "media" })
@@ -162,9 +154,7 @@ final class EndToEndTests: XCTestCase {
     func testVerifyReportIsEncodableAsJSON() throws {
         let output = try makeTemporaryDirectory(self)
         try convertFixtures(into: output)
-        let report = try Verifier(
-            inputDirectory: Fixtures.directory, outputDirectory: output
-        ).run()
+        let report = try Verifier(inputs: [Fixtures.directory], outputDirectory: output).run()
 
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
@@ -181,18 +171,18 @@ final class EndToEndTests: XCTestCase {
     func testNoNoteLosesTextThroughTheFullPipeline() throws {
         let output = try makeTemporaryDirectory(self)
 
-        for location in try VaultWriter.locations(inInputDirectory: Fixtures.directory) {
+        for location in try VaultWriter.locations(forInputs: [Fixtures.directory]) {
             let writer = try VaultWriter(
                 outputRoot: output,
                 directoryName: location.directoryName,
                 notebookName: location.notebookName,
-                sourceFileName: location.fileURL.lastPathComponent,
                 clean: false
             )
             let directory = output.appendingPathComponent(location.directoryName)
+            let fileURL = location.fileURLs[0]
 
-            try ENEXParser.parse(fileURL: location.fileURL) { note in
-                let outcome = try writer.write(note)
+            try ENEXParser.parse(fileURL: fileURL) { note in
+                let outcome = try writer.write(note, sourceFile: fileURL.lastPathComponent)
                 guard let tree = try? ENMLDocument.parse(note.content) else { return }
                 let written = try String(
                     contentsOf: directory.appendingPathComponent(outcome.fileName),

@@ -15,8 +15,13 @@ swift build -c release
 .build/release/enexodus verify  --input ~/EvernoteExport --output ~/Vault
 ```
 
-`--input` is a `.enex` file, or a directory of them — one per notebook. ENEX does not record the
-notebook name, so the **filename is the notebook name**.
+`--input` is a `.enex` file, or a directory of them — one per notebook, and it may be repeated.
+ENEX does not record the notebook name, so the **filename is the notebook name**.
+
+Evernote caps an export at 100 notes per file and suffixes the overflow, so one notebook can
+arrive as `My Notes.enex` + `My Notes (1).enex` + `My Notes (2).enex`. Those are merged into a
+single folder; only a trailing parenthesised integer counts, so a notebook genuinely named
+`Recipes (old)` is left alone.
 
 | Flag | Command | Meaning |
 | --- | --- | --- |
@@ -90,6 +95,9 @@ the input is 72 MB, 290 MB, or 580 MB.
 
 No network access at runtime; the Evernote DTD is never fetched. The only dependency is
 `swift-argument-parser`.
+
+One known omission: Foundation's XMLParser drops U+FEFF (zero-width no-break space) from
+character data. Nothing visible is lost, but a stray BOM pasted mid-note will not survive.
 
 ## Requirements
 

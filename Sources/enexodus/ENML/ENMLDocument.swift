@@ -67,6 +67,10 @@ enum ENMLDocument {
     }
 
     /// Entity normalization, DOCTYPE removal, and BOM/whitespace trimming.
+    ///
+    /// Note: Foundation's XMLParser (libxml2) silently drops U+FEFF from character data wherever
+    /// it appears, not just at the start. It is ZERO WIDTH NO-BREAK SPACE, so nothing visible is
+    /// lost, but a stray one copied into a note will not survive into the Markdown.
     static func prepare(_ enml: String) -> String {
         var text = enml
         if text.hasPrefix("\u{FEFF}") { text.removeFirst() }

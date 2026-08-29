@@ -57,11 +57,20 @@ struct VerificationReport: Codable {
 /// so a bug in the writer cannot make the check agree with itself.
 struct Verifier {
 
-    var inputDirectory: URL
+    var inputs: [URL]
     var outputDirectory: URL
 
+    init(inputs: [URL], outputDirectory: URL) {
+        self.inputs = inputs
+        self.outputDirectory = outputDirectory
+    }
+
+    init(inputDirectory: URL, outputDirectory: URL) {
+        self.init(inputs: [inputDirectory], outputDirectory: outputDirectory)
+    }
+
     func run() throws -> VerificationReport {
-        let locations = try VaultWriter.locations(inInputDirectory: inputDirectory)
+        let locations = try VaultWriter.locations(forInputs: inputs)
         var reports: [NotebookReport] = []
         var totals = VerificationTotals()
 
@@ -97,10 +106,12 @@ struct Verifier {
         var hashes: Set<String> = []
         var mediaReferences = 0
 
-        try ENEXParser.parse(fileURL: location.fileURL) { note in
-            notes += 1
-            for resource in note.resources { hashes.insert(resource.md5) }
-            mediaReferences += Verifier.countOccurrences(of: "<en-media", in: note.content)
+        for fileURL in location.fileURLs {
+            try ENEXParser.parse(fileURL: fileURL) { note in
+                notes += 1
+                for resource in note.resources { hashes.insert(resource.md5) }
+                mediaReferences += Verifier.countOccurrences(of: "<en-media", in: note.content)
+            }
         }
 
         let directory = outputDirectory.appendingPathComponent(
@@ -134,7 +145,7 @@ struct Verifier {
 
         return NotebookReport(
             notebook: location.notebookName,
-            enexFile: location.fileURL.lastPathComponent,
+            enexFile: location.fileURLs.map(\.lastPathComponent).joined(separator: ", "),
             directory: location.directoryName,
             enexNotes: notes,
             enexResources: hashes.count,
