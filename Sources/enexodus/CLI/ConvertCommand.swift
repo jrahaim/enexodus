@@ -9,7 +9,7 @@ struct ConvertCommand: ParsableCommand {
 
     @Option(
         name: [.customShort("i"), .customLong("input")],
-        help: ArgumentHelp("Directory containing .enex files.", valueName: "enex-dir")
+        help: ArgumentHelp("A .enex file, or a directory of them.", valueName: "enex-path")
     )
     var input: String
 
@@ -40,20 +40,17 @@ struct ConvertCommand: ParsableCommand {
 
     func run() throws {
         let fileManager = FileManager.default
-        let inputDirectory = URL(fileURLWithPath: input, isDirectory: true)
+        let inputDirectory = URL(fileURLWithPath: input)
         let outputDirectory = URL(fileURLWithPath: output, isDirectory: true)
 
-        var isDirectory: ObjCBool = false
-        guard fileManager.fileExists(atPath: inputDirectory.path, isDirectory: &isDirectory),
-            isDirectory.boolValue
-        else {
-            throw ValidationError("input is not a directory: \(inputDirectory.path)")
+        guard fileManager.fileExists(atPath: inputDirectory.path) else {
+            throw ValidationError("no such file or directory: \(inputDirectory.path)")
         }
         try fileManager.createDirectory(at: outputDirectory, withIntermediateDirectories: true)
 
         let locations = try VaultWriter.locations(inInputDirectory: inputDirectory)
         guard !locations.isEmpty else {
-            throw ValidationError("no .enex files found in \(inputDirectory.path)")
+            throw ValidationError("no .enex files found at \(inputDirectory.path)")
         }
 
         var totalNotes = 0

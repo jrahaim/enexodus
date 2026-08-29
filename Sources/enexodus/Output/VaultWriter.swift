@@ -30,19 +30,31 @@ final class VaultWriter {
 
     static let attachmentsDirectoryName = "_attachments"
 
-    /// Discovers the `.enex` files in `directory` and assigns each its vault directory name.
+    /// Resolves the input path — a directory of `.enex` files, or a single `.enex` file — into
+    /// the notebooks to convert, each with its vault directory name.
     ///
     /// Sorted by filename and disambiguated in that order, so both `convert` and `verify`
     /// derive identical directory names without sharing state.
-    static func locations(inInputDirectory directory: URL) throws -> [NotebookLocation] {
-        let contents = try FileManager.default.contentsOfDirectory(
-            at: directory,
-            includingPropertiesForKeys: nil,
-            options: [.skipsHiddenFiles]
-        )
-        let enexFiles = contents
+    static func locations(inInputDirectory input: URL) throws -> [NotebookLocation] {
+        let manager = FileManager.default
+        var isDirectory: ObjCBool = false
+        guard manager.fileExists(atPath: input.path, isDirectory: &isDirectory) else {
+            throw CocoaError(.fileNoSuchFile, userInfo: [NSFilePathErrorKey: input.path])
+        }
+
+        let enexFiles: [URL]
+        if isDirectory.boolValue {
+            enexFiles = try manager.contentsOfDirectory(
+                at: input,
+                includingPropertiesForKeys: nil,
+                options: [.skipsHiddenFiles]
+            )
             .filter { $0.pathExtension.lowercased() == "enex" }
             .sorted { $0.lastPathComponent < $1.lastPathComponent }
+        } else {
+            // A single .enex file is one notebook — the common case when checking one export.
+            enexFiles = input.pathExtension.lowercased() == "enex" ? [input] : []
+        }
 
         var used: Set<String> = []
         return enexFiles.map { url in

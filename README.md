@@ -9,12 +9,14 @@ Converts Evernote ENEX exports into a folder-per-notebook Markdown archive.
 
 ```bash
 swift build -c release
+# a whole export, or a single notebook
 .build/release/enexodus convert --input ~/EvernoteExport --output ~/Vault
+.build/release/enexodus convert --input ~/EvernoteExport/Recipes.enex --output ~/Vault
 .build/release/enexodus verify  --input ~/EvernoteExport --output ~/Vault
 ```
 
-`--input` is a directory of `.enex` files, one per notebook. ENEX does not record the notebook
-name, so the **filename is the notebook name**.
+`--input` is a `.enex` file, or a directory of them — one per notebook. ENEX does not record the
+notebook name, so the **filename is the notebook name**.
 
 | Flag | Command | Meaning |
 | --- | --- | --- |

@@ -226,6 +226,27 @@ final class VaultWriterTests: XCTestCase {
 
     // MARK: Layout
 
+    /// A single .enex file is one notebook. Requiring a directory forced callers to build a
+    /// throwaway folder just to convert one export.
+    func testSingleFileInputResolvesToOneNotebook() throws {
+        let locations = try VaultWriter.locations(inInputDirectory: Fixtures.url("plain"))
+        XCTAssertEqual(locations.count, 1)
+        XCTAssertEqual(locations[0].notebookName, "plain")
+        XCTAssertEqual(locations[0].directoryName, "plain")
+    }
+
+    func testNonEnexFileInputResolvesToNothing() throws {
+        let directory = try makeTemporaryDirectory(self)
+        let stray = directory.appendingPathComponent("notes.txt")
+        try Data("not an export".utf8).write(to: stray)
+        XCTAssertTrue(try VaultWriter.locations(inInputDirectory: stray).isEmpty)
+    }
+
+    func testMissingInputThrows() {
+        let missing = URL(fileURLWithPath: "/nonexistent/nowhere.enex")
+        XCTAssertThrowsError(try VaultWriter.locations(inInputDirectory: missing))
+    }
+
     func testNotebookDirectoryNamesComeFromFilenames() throws {
         let locations = try VaultWriter.locations(inInputDirectory: Fixtures.directory)
         XCTAssertEqual(locations.map(\.notebookName), Fixtures.names)
