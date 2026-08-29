@@ -133,27 +133,125 @@ private final class RenderState {
 
     // MARK: Block level
 
-    /// Renders a run of sibling nodes into top-level Markdown blocks.
+    /// One piece of rendered output, before blocks are assembled.
     ///
-    /// Runs of inline siblings are gathered into a paragraph; a block-level element flushes
-    /// whatever inline content preceded it. Empty containers produce no block at all, which is
-    /// what collapses Evernote's `<div><br/></div>` spacer runs into a single blank line.
+    /// The distinction that matters is `line` vs `paragraphBreak`. Evernote writes one `<div>`
+    /// per *line*, and writes an explicit `<div><br/></div>` where the author wanted a blank
+    /// line. Treating every div as its own paragraph destroys that: consecutive lines become
+    /// double-spaced and the author's real paragraph breaks disappear.
+    enum Fragment {
+        /// A visual line. Adjacent lines join into one block.
+        case line(String)
+        /// Self-contained output (list, table, heading, quote, code fence, fallback).
+        case block(String)
+        /// A line that is entirely monospace. Consecutive ones fuse into one fenced block.
+        case codeLine(String)
+        /// A blank line: ends whatever block is being accumulated.
+        case paragraphBreak
+    }
+
     func renderBlocks(_ nodes: [ENMLNode], listDepth: Int) -> [String] {
+        assemble(renderFragments(nodes, listDepth: listDepth))
+    }
+
+    /// Joins adjacent fragments into blocks: runs of lines become paragraphs, runs of code
+    /// lines become a single fence, and `paragraphBreak` ends whatever is accumulating.
+    private func assemble(_ fragments: [Fragment]) -> [String] {
         var blocks: [String] = []
+        var pending: [String] = []
+        var code: [String] = []
+
+        func flushProse() {
+            guard !pending.isEmpty else { return }
+            blocks.append(pending.joined(separator: "\n"))
+            pending.removeAll()
+        }
+        func flushCode() {
+            // A trailing blank line inside a listing is spacing, not content.
+            while code.last?.isEmpty == true { code.removeLast() }
+            guard !code.isEmpty else { return }
+            blocks.append(codeFence(code.joined(separator: "\n")))
+            code.removeAll()
+        }
+
+        for fragment in fragments {
+            switch fragment {
+            case .codeLine(let line):
+                // Evernote writes one <div> per line, so a listing arrives as a run of separate
+                // monospace divs. Fusing them back into one fence is the whole point.
+                flushProse()
+                code.append(line)
+
+            case .line(let line):
+                flushCode()
+                // A task list must be its own block in both directions: prose running straight
+                // into it would be swallowed as a list item, and prose straight after it would
+                // become a lazy continuation of the last item.
+                if let previous = pending.last,
+                    RenderState.isTaskLine(line) != RenderState.isTaskLine(previous)
+                {
+                    flushProse()
+                }
+                pending.append(line)
+
+            case .paragraphBreak:
+                // A blank line in the middle of a listing stays part of the listing.
+                if !code.isEmpty {
+                    code.append("")
+                } else {
+                    flushProse()
+                }
+
+            case .block(let block):
+                flushCode()
+                flushProse()
+                blocks.append(block)
+            }
+        }
+        flushCode()
+        flushProse()
+        return blocks
+    }
+
+    private static func isTaskLine(_ line: String) -> Bool {
+        line.hasPrefix("- [ ] ") || line.hasPrefix("- [x] ")
+    }
+
+    /// Walks a run of sibling nodes, gathering inline content into lines and delegating
+    /// block-level elements.
+    private func renderFragments(_ nodes: [ENMLNode], listDepth: Int) -> [Fragment] {
+        var out: [Fragment] = []
         var inlineBuffer: [ENMLNode] = []
 
         func flushInline() {
             guard !inlineBuffer.isEmpty else { return }
-            let rendered = renderInline(inlineBuffer)
+            var buffer = inlineBuffer
             inlineBuffer.removeAll()
-            let paragraph = finalizeParagraph(rendered)
-            if !paragraph.isEmpty { blocks.append(paragraph) }
+
+            // `<en-note><en-todo/>text` — a checklist row that never got wrapped in a div.
+            var checkbox: String?
+            if let index = firstMeaningfulIndex(buffer), index == 0 || buffer.count > index,
+                case .element(let candidate) = buffer[index],
+                candidate.name.lowercased() == "en-todo"
+            {
+                let checked = (candidate["checked"] ?? "false").lowercased() == "true"
+                checkbox = checked ? "- [x] " : "- [ ] "
+                buffer.remove(at: index)
+            }
+
+            let lines = paragraphLines(renderInline(buffer))
+            if lines.isEmpty {
+                out.append(.paragraphBreak)
+            } else if let checkbox {
+                out.append(.line(checkbox + lines.joined(separator: " ")))
+            } else {
+                out.append(contentsOf: lines.map(Fragment.line))
+            }
         }
 
         for node in nodes {
             switch node {
             case .text(let text):
-                // Whitespace between block elements is layout, not content.
                 if inlineBuffer.isEmpty,
                     text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                 {
@@ -165,47 +263,63 @@ private final class RenderState {
                 let name = element.name.lowercased()
                 if RenderState.blockElements.contains(name) || !RenderState.isKnown(name) {
                     flushInline()
-                    blocks.append(contentsOf: renderBlockElement(element, listDepth: listDepth))
+                    out.append(contentsOf: fragments(for: element, listDepth: listDepth))
                 } else {
                     inlineBuffer.append(node)
                 }
             }
         }
         flushInline()
-        return blocks
+        return out
     }
 
-    private func renderBlockElement(_ element: ENMLElement, listDepth: Int) -> [String] {
+    private func fragments(for element: ENMLElement, listDepth: Int) -> [Fragment] {
         let name = element.name.lowercased()
 
         switch name {
-        case "en-note", "center", "div", "p", "td", "th", "caption":
-            if isCodeBlock(element) {
-                return [codeFence(plainText(element))]
+        case "en-note", "center", "td", "th", "caption":
+            return renderFragments(element.children, listDepth: listDepth)
+
+        case "div":
+            if let fence = evernoteCodeBlock(element) { return [.block(fence)] }
+            if isEntirelyMonospace(element) {
+                return [.codeLine(trimmedTrailingNewlines(plainText(element)))]
             }
-            return renderBlocks(element.children, listDepth: listDepth)
+            if let task = taskLine(for: element) { return [.line(task)] }
+            let inner = renderFragments(element.children, listDepth: listDepth)
+            // An empty div is Evernote's blank line, not nothing.
+            return inner.isEmpty ? [.paragraphBreak] : inner
+
+        case "p":
+            // <p> really is a paragraph, unlike Evernote's <div>.
+            if let fence = evernoteCodeBlock(element) { return [.block(fence)] }
+            if isEntirelyMonospace(element) {
+                return [.codeLine(trimmedTrailingNewlines(plainText(element)))]
+            }
+            let inner = renderFragments(element.children, listDepth: listDepth)
+            return inner.isEmpty ? [.paragraphBreak] : [.paragraphBreak] + inner + [.paragraphBreak]
 
         case "h1", "h2", "h3", "h4", "h5", "h6":
             let level = Int(name.dropFirst()) ?? 1
             let text = singleLine(renderInline(element.children))
             guard !text.isEmpty else { return [] }
-            return ["\(String(repeating: "#", count: level)) \(text)"]
+            return [.block("\(String(repeating: "#", count: level)) \(text)")]
 
         case "ul":
-            return renderList(element, ordered: false, listDepth: listDepth)
+            return renderList(element, ordered: false, listDepth: listDepth).map(Fragment.block)
 
         case "ol":
-            return renderList(element, ordered: true, listDepth: listDepth)
+            return renderList(element, ordered: true, listDepth: listDepth).map(Fragment.block)
 
         case "li":
             // A stray <li> outside any list; render its content rather than dropping it.
-            return renderBlocks(element.children, listDepth: listDepth)
+            return renderFragments(element.children, listDepth: listDepth)
 
         case "table":
-            return renderTable(element, listDepth: listDepth)
+            return renderTable(element, listDepth: listDepth).map(Fragment.block)
 
         case "thead", "tbody", "tfoot", "tr", "colgroup", "col":
-            return renderBlocks(element.children, listDepth: listDepth)
+            return renderFragments(element.children, listDepth: listDepth)
 
         case "blockquote":
             let inner = renderBlocks(element.children, listDepth: listDepth)
@@ -214,17 +328,35 @@ private final class RenderState {
                 .components(separatedBy: "\n")
                 .map { $0.isEmpty ? ">" : "> \($0)" }
                 .joined(separator: "\n")
-            return [quoted]
+            return [.block(quoted)]
 
         case "pre":
-            return [codeFence(plainText(element))]
+            return [.block(codeFence(plainText(element)))]
 
         case "hr":
-            return ["---"]
+            return [.block("---")]
 
         default:
-            return [fallback(element, reason: "unmapped-element:\(name)")]
+            return [.block(fallback(element, reason: "unmapped-element:\(name)"))]
         }
+    }
+
+    /// A block container whose first meaningful child is `<en-todo>` is a checklist row.
+    ///
+    /// `<div><en-todo checked="true"/>text</div>` is the shape Evernote's own checklists use —
+    /// far more common in real exports than `<li><en-todo/>`. Rendering it as a bare glyph
+    /// loses the checkbox entirely.
+    private func taskLine(for element: ENMLElement) -> String? {
+        var children = element.children
+        guard let index = firstMeaningfulIndex(children),
+            case .element(let candidate) = children[index],
+            candidate.name.lowercased() == "en-todo"
+        else { return nil }
+
+        let checked = (candidate["checked"] ?? "false").lowercased() == "true"
+        children.remove(at: index)
+        let text = singleLine(renderInline(children))
+        return checked ? "- [x] \(text)" : "- [ ] \(text)"
     }
 
     // MARK: Lists
@@ -525,6 +657,13 @@ private final class RenderState {
     }
 
     private func styled(_ element: ElementAlias) -> String {
+        // A monospace run inside a line is Evernote's inline code.
+        if RenderState.declaresMonospace(element) {
+            let text = plainText(element)
+            if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, !text.contains("\n") {
+                return codeSpan(text.trimmingCharacters(in: .whitespaces))
+            }
+        }
         let style = (element["style"] ?? "").lowercased().replacingOccurrences(of: " ", with: "")
         var markers: [String] = []
         if style.contains("font-weight:bold") || style.contains("font-weight:700")
@@ -635,7 +774,7 @@ private final class RenderState {
         for child in element.children {
             switch child {
             case .text(let text):
-                out += text
+                out += RenderState.normalizeSpaces(text)
             case .element(let inner):
                 let name = inner.name.lowercased()
                 if name == "br" {
@@ -653,9 +792,60 @@ private final class RenderState {
         return out
     }
 
-    private func isCodeBlock(_ element: ElementAlias) -> Bool {
-        guard let style = element["style"] else { return false }
-        return style.replacingOccurrences(of: " ", with: "").lowercased().contains("en-codeblock:true")
+    /// Monospace families that reliably mean "this is code" when Evernote has no code-block
+    /// marker. Deliberately a closed list: guessing from an arbitrary font would turn prose
+    /// into code blocks, which is worse than leaving code as prose.
+    private static let monospaceFamilies = [
+        "courier", "monaco", "consolas", "menlo", "monospace", "lucida console",
+        "andale mono", "dejavu sans mono", "roboto mono", "source code pro", "sf mono",
+        "ibm plex mono", "fira code", "inconsolata", "pt mono", "liberation mono",
+    ]
+
+    /// A fenced code block when Evernote explicitly marked this container as one.
+    private func evernoteCodeBlock(_ element: ElementAlias) -> String? {
+        guard let style = element["style"],
+            style.replacingOccurrences(of: " ", with: "").lowercased().contains("en-codeblock:true")
+        else { return nil }
+        return codeFence(plainText(element))
+    }
+
+    private func trimmedTrailingNewlines(_ text: String) -> String {
+        var out = text
+        while out.hasSuffix("\n") { out.removeLast() }
+        return out
+    }
+
+    /// True when every text-bearing descendant sits inside a monospace font, and at least one
+    /// such font is actually declared.
+    private func isEntirelyMonospace(_ element: ElementAlias) -> Bool {
+        var sawMonospace = false
+        var sawUnstyledText = false
+
+        func walk(_ node: ENMLNode, inMonospace: Bool) {
+            switch node {
+            case .text(let text):
+                guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+                if inMonospace { sawMonospace = true } else { sawUnstyledText = true }
+            case .element(let child):
+                let nested = inMonospace || RenderState.declaresMonospace(child)
+                for grandchild in child.children { walk(grandchild, inMonospace: nested) }
+            }
+        }
+
+        for child in element.children {
+            walk(child, inMonospace: RenderState.declaresMonospace(element))
+        }
+        return sawMonospace && !sawUnstyledText
+    }
+
+    /// Whether this element itself declares a monospace font, via `face=` or `font-family:`.
+    static func declaresMonospace(_ node: ENMLElement) -> Bool {
+        let face = (node["face"] ?? "").lowercased()
+        let style = (node["style"] ?? "").lowercased()
+        let declaresFamily = style.contains("font-family")
+        return monospaceFamilies.contains { family in
+            face.contains(family) || (declaresFamily && style.contains(family))
+        }
     }
 
     private func codeFence(_ code: String) -> String {
@@ -673,20 +863,21 @@ private final class RenderState {
             .trimmingCharacters(in: .whitespaces)
     }
 
-    /// Turns accumulated inline text into a paragraph block: trailing whitespace trimmed,
-    /// `<br/>` runs collapsed to one hard break, and line-leading Markdown syntax escaped.
-    private func finalizeParagraph(_ text: String) -> String {
-        let lines =
-            text
+    /// Splits accumulated inline text into visual lines: trailing whitespace trimmed, blank
+    /// lines dropped, line-leading Markdown syntax escaped.
+    ///
+    /// Lines are later joined with a plain newline rather than a backslash hard break. Obsidian
+    /// — the stated primary target — renders a single newline as a line break, and hundreds of
+    /// trailing backslashes make the source unreadable. Strict CommonMark treats these as soft
+    /// breaks; the plan's Phase 2 output-flavour toggle is where that becomes selectable.
+    private func paragraphLines(_ text: String) -> [String] {
+        text
             .components(separatedBy: "\n")
-            .map { line -> String in
+            .map { line in
                 String(line.reversed().drop(while: { $0 == " " || $0 == "\t" }).reversed())
             }
             .filter { !$0.isEmpty }
-        guard !lines.isEmpty else { return "" }
-        // A backslash at end of line is CommonMark's unambiguous hard break; trailing spaces
-        // would be stripped by editors and git.
-        return lines.map(escapeLineStart).joined(separator: "\\\n")
+            .map(escapeLineStart)
     }
 
     /// Escapes Markdown block syntax that only has meaning at the start of a line.
@@ -731,11 +922,33 @@ private final class RenderState {
         return line
     }
 
+    /// Collapses the exotic space characters Evernote writes into ordinary spaces.
+    ///
+    /// Evernote uses U+00A0 as its everyday word separator — 13,727 of them in a single 115 KB
+    /// real notebook, a quarter of all characters. Left alone, `grep` and Obsidian search stop
+    /// matching ordinary queries, which defeats the point of the archive. Whitespace is
+    /// explicitly outside the losslessness contract ("modulo whitespace"), so normalising is safe.
+    static func normalizeSpaces(_ text: String) -> String {
+        guard text.contains(where: { RenderState.exoticSpaces.contains($0) }) else { return text }
+        return String(
+            text.map { RenderState.exoticSpaces.contains($0) ? " " : $0 }
+        )
+    }
+
+    private static let exoticSpaces: Set<Character> = [
+        "\u{00A0}",  // no-break space
+        "\u{2007}",  // figure space
+        "\u{202F}",  // narrow no-break space
+        "\u{2009}",  // thin space
+        "\u{200B}",  // zero-width space
+    ]
+
     /// Escapes the inline Markdown metacharacters. Deliberately narrow: `_` is only escaped at
     /// word boundaries and `~` only when doubled, so ordinary prose and snake_case identifiers
     /// do not acquire backslashes they do not need.
-    func escapeInline(_ text: String) -> String {
-        guard !text.isEmpty else { return "" }
+    func escapeInline(_ rawText: String) -> String {
+        guard !rawText.isEmpty else { return "" }
+        let text = RenderState.normalizeSpaces(rawText)
         let characters = Array(text)
         var out = ""
         out.reserveCapacity(text.count)

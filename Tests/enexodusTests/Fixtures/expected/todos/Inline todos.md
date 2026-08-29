@@ -7,8 +7,7 @@ notebook: "todos"
 enex-source: "todos.enex"
 ---
 
-☐Water the plants
-
-☑Take out bins
+- [ ] Water the plants
+- [x] Take out bins
 
 Progress so far ☑ and remaining ☐ today.

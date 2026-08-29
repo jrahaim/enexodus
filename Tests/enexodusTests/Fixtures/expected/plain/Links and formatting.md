@@ -9,7 +9,6 @@ enex-source: "plain.enex"
 ---
 
 See [the docs](https://example.com/docs) and [this one](<https://example.com/a(b)>).
-
 Struck: ~~old plan~~. Underlined: <u>keep</u>. Code: `swift build`.
 
 ## A heading

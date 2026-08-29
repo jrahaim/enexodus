@@ -39,6 +39,25 @@ present, `notebook`, `enex-source`) followed by the rendered body.
 
 ## Design
 
+**Evernote's `<div>` is a line, not a paragraph.** Evernote writes one `<div>` per visual line
+and an explicit `<div><br/></div>` where the author wanted a blank one. Treating every div as a
+paragraph double-spaces the whole archive and destroys the author's real structure, so
+consecutive divs become consecutive lines and only spacer divs break a paragraph.
+
+Related consequences of that model:
+
+- Lines within a block are joined with a plain newline, which Obsidian renders as a line break.
+  Strict CommonMark treats it as a soft break; the Phase 2 output-flavour toggle is where that
+  becomes selectable.
+- `<en-todo>` leading *any* block container becomes `- [ ]` / `- [x]`, not only inside `<li>`.
+  `<div><en-todo/>text</div>` is the shape Evernote's own checklists use.
+- A container whose text is entirely in a monospace font becomes a fenced code block, and
+  consecutive such lines fuse into one fence. Older exports have no `--en-codeblock` marker —
+  in one real 255-note export only 2 notes used it, versus 37 using monospace fonts.
+- U+00A0 and friends are normalized to ordinary spaces. Evernote uses non-breaking space as its
+  everyday word separator, which silently breaks Obsidian search and `grep`. Whitespace is
+  outside the losslessness contract, so this is safe.
+
 **Lossless over pretty.** ENML that does not map cleanly onto Markdown is emitted as sanitized
 inline HTML rather than approximated or dropped. Every such block is preceded by
 `<!-- enexodus:html-fallback reason="..." -->`, and an `<en-media>` whose hash matches no

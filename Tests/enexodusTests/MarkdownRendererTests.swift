@@ -38,12 +38,41 @@ final class MarkdownRendererTests: XCTestCase {
         XCTAssertEqual(markdown("<hr/>"), "---")
         XCTAssertEqual(
             markdown("<blockquote><div>Quoted</div><div>Lines</div></blockquote>"),
-            "> Quoted\n>\n> Lines"
+            "> Quoted\n> Lines"
+        )
+        XCTAssertEqual(
+            markdown("<blockquote><div>One</div><div><br/></div><div>Two</div></blockquote>"),
+            "> One\n>\n> Two",
+            "an explicit spacer div is a real paragraph break inside the quote"
         )
     }
 
-    func testHardLineBreakUsesBackslash() {
-        XCTAssertEqual(markdown("<div>One<br/>Two</div>"), "One\\\nTwo")
+    func testLineBreaksAreNewlinesNotBackslashes() {
+        XCTAssertEqual(markdown("<div>One<br/>Two</div>"), "One\nTwo")
+    }
+
+    /// Evernote writes one <div> per line and an explicit <div><br/></div> where the author
+    /// wanted a blank one. Both must survive, or every note comes out uniformly double-spaced
+    /// with the real structure gone.
+    func testConsecutiveDivsAreLinesAndSpacerDivsAreParagraphBreaks() {
+        XCTAssertEqual(
+            markdown("<div>a</div><div>b</div><div>c</div>"),
+            "a\nb\nc"
+        )
+        XCTAssertEqual(
+            markdown("<div>a</div><div>b</div><div><br/></div><div>c</div><div>d</div>"),
+            "a\nb\n\nc\nd"
+        )
+        XCTAssertEqual(
+            markdown("<div>a</div><div><br/></div><div><br/></div><div>b</div>"),
+            "a\n\nb",
+            "consecutive spacer divs collapse to a single blank line"
+        )
+    }
+
+    /// <p> is a real paragraph in HTML, unlike Evernote's <div>.
+    func testParagraphElementsStaySeparated() {
+        XCTAssertEqual(markdown("<p>one</p><p>two</p>"), "one\n\ntwo")
     }
 
     // MARK: Inline
@@ -124,6 +153,60 @@ final class MarkdownRendererTests: XCTestCase {
         )
     }
 
+    /// Older Evernote notes have no `--en-codeblock` marker; code is just a monospace font.
+    /// Only 2 of 255 notes in a real export used the marker, versus 37 using monospace.
+    func testMonospaceBlockBecomesACodeFence() {
+        XCTAssertEqual(
+            markdown("<div><font face=\"Courier New\">line one<br/>line two</font></div>"),
+            "```\nline one\nline two\n```"
+        )
+        XCTAssertEqual(
+            markdown("<div style=\"font-family: Monaco;\">a()<br/>b()</div>"),
+            "```\na()\nb()\n```"
+        )
+    }
+
+    /// Evernote emits one <div> per line, so a listing arrives as a run of separate monospace
+    /// divs. They have to fuse back into a single fence rather than becoming N code spans.
+    func testConsecutiveMonospaceLinesFuseIntoOneFence() {
+        XCTAssertEqual(
+            markdown(
+                "<div><font face=\"Courier\">servers:</font></div>"
+                    + "<div><font face=\"Courier\">10.58.56.30</font></div>"
+                    + "<div><font face=\"Courier\">10.58.56.31</font></div>"
+            ),
+            "```\nservers:\n10.58.56.30\n10.58.56.31\n```"
+        )
+    }
+
+    func testProseSeparatesTwoCodeRuns() {
+        XCTAssertEqual(
+            markdown(
+                "<div><font face=\"Courier\">one</font></div>"
+                    + "<div>prose</div>"
+                    + "<div><font face=\"Courier\">two</font></div>"
+            ),
+            "```\none\n```\n\nprose\n\n```\ntwo\n```"
+        )
+    }
+
+    func testMonospaceDetectionDoesNotSwallowProse() {
+        XCTAssertEqual(
+            markdown("<div><font face=\"Helvetica\">just prose<br/>more prose</font></div>"),
+            "just prose\nmore prose"
+        )
+        XCTAssertEqual(
+            markdown("<div>prose then <font face=\"Courier New\">code</font><br/>more</div>"),
+            "prose then `code`\nmore",
+            "a mixed block stays prose; only a wholly monospace block is a fence"
+        )
+        XCTAssertEqual(
+            markdown("<div><font face=\"Courier New\">single line</font></div>"),
+            "```\nsingle line\n```",
+            "a wholly monospace div is a code line, even on its own"
+        )
+    }
+
     func testCodeFenceGrowsToAvoidCollision() {
         XCTAssertEqual(markdown("<pre>a ``` b</pre>"), "````\na ``` b\n````")
     }
@@ -148,10 +231,36 @@ final class MarkdownRendererTests: XCTestCase {
         )
     }
 
-    /// Per plan §4 WP-3.2 an `<en-todo>` outside a list item renders as an inline glyph.
-    /// This is the shape Evernote uses for its most common checklists — see the report.
-    func testTodoOutsideListItemRendersAsGlyph() {
-        XCTAssertEqual(markdown("<div><en-todo checked=\"false\"/>task</div>"), "\u{2610}task")
+    /// `<div><en-todo/>text</div>` is the shape Evernote's own checklists use, and it is far
+    /// more common in real exports than `<li><en-todo/>`. It has to become a checkbox too.
+    func testTodoLeadingABlockContainerBecomesCheckbox() {
+        XCTAssertEqual(markdown("<div><en-todo checked=\"false\"/>task</div>"), "- [ ] task")
+        XCTAssertEqual(markdown("<div><en-todo checked=\"true\"/>done</div>"), "- [x] done")
+        XCTAssertEqual(
+            markdown(
+                "<div><en-todo checked=\"true\"/>one</div><div><en-todo checked=\"false\"/>two</div>"
+            ),
+            "- [x] one\n- [ ] two",
+            "consecutive checklist rows form one list"
+        )
+    }
+
+    /// A task list has to be its own block in both directions, or CommonMark swallows the
+    /// neighbouring prose into the list.
+    func testTodoListIsSeparatedFromSurroundingProse() {
+        XCTAssertEqual(
+            markdown("<div>Intro line</div><div><en-todo checked=\"false\"/>task</div>"),
+            "Intro line\n\n- [ ] task"
+        )
+        XCTAssertEqual(
+            markdown("<div><en-todo checked=\"false\"/>task</div><div>Trailing note</div>"),
+            "- [ ] task\n\nTrailing note"
+        )
+    }
+
+    /// An `<en-todo>` that is genuinely mid-sentence still renders as a glyph — there is no
+    /// checkbox to put in the middle of a line.
+    func testTodoMidLineRemainsAGlyph() {
         XCTAssertEqual(markdown("<div>a <en-todo checked=\"true\"/> b</div>"), "a \u{2611} b")
     }
 
@@ -313,16 +422,21 @@ final class MarkdownRendererTests: XCTestCase {
     func testUnclosedVoidElementsAreRepairedNotFallenBackOn() {
         let result = MarkdownRenderer().renderENML("<en-note><div>a<br>b</div></en-note>")
         XCTAssertEqual(result.fallbackBlocks, 0)
-        XCTAssertEqual(result.markdown, "a\\\nb")
+        XCTAssertEqual(result.markdown, "a\nb")
     }
 
     // MARK: Entities
 
     func testNamedEntitiesAreDecoded() {
-        XCTAssertEqual(
-            markdown("<div>Caf&eacute; &mdash; 50&nbsp;&euro;</div>"),
-            "Café — 50\u{00A0}€"
-        )
+        XCTAssertEqual(markdown("<div>Caf&eacute; &mdash; 50&euro;</div>"), "Café — 50€")
+    }
+
+    /// Evernote uses U+00A0 as its ordinary word separator. Left in place it breaks Obsidian
+    /// search and grep for perfectly normal queries.
+    func testNonBreakingSpacesBecomeOrdinarySpaces() {
+        XCTAssertEqual(markdown("<div>50&nbsp;&euro;</div>"), "50 €")
+        XCTAssertEqual(markdown("<div>a\u{00A0}b\u{202F}c\u{2007}d</div>"), "a b c d")
+        XCTAssertFalse(markdown("<div>x&nbsp;y</div>").contains("\u{00A0}"))
     }
 
     func testUnknownEntityIsKeptAsLiteralText() {

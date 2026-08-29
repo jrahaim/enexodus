@@ -7,12 +7,8 @@ notebook: "hostile"
 enex-source: "hostile.enex"
 ---
 
-Café & bar — 5 \< 10. Price: 50 €
-
+Café & bar — 5 \< 10. Price: 50 €
 \# Not a heading
-
 \- not a list item
-
 1\. not an ordered item
-
 a_b_c, \*stars\*, \[brackets\], \`ticks\`, and a \<tag>

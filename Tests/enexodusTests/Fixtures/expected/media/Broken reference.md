@@ -8,7 +8,5 @@ enex-source: "media.enex"
 ---
 
 The image below was never exported:
-
 <!-- enexodus:missing-resource hash="00000000000000000000000000000000" mime="image/png" -->
-
 Everything after it must survive.
