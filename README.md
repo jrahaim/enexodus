@@ -70,6 +70,25 @@ exports into the same vault is the normal case.
 
 `verify` exits non-zero on any mismatch, which makes it usable as a CI or pre-commit gate.
 
+### Converting into a cloud-synced folder
+
+Avoid `--clean` when `--output` is inside iCloud Drive, Dropbox or OneDrive. `--clean` deletes a
+notebook folder and immediately rewrites the same filenames; the sync client races that and
+restores the versions it had not finished uploading, leaving duplicates beside the real files —
+`Note 2.md`, `Note 3.md` — with the sync client's own naming, not the `-2` suffix enexodus uses
+for genuine title collisions.
+
+Convert somewhere local and move the finished vault into place instead:
+
+```bash
+enexodus convert -i ~/EvernoteExport -o /tmp/vault-build
+enexodus verify  -i ~/EvernoteExport -o /tmp/vault-build
+mv /tmp/vault-build ~/Documents/Vault
+```
+
+A single move gives the sync client no window to race. If it has already happened, `verify` will
+catch it: the duplicates make the `.md` count exceed the note count.
+
 ## Output layout
 
 ```

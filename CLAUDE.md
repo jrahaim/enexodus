@@ -86,6 +86,11 @@ whole block model turns on it.
   line break. Invisible in prose (blank lines get filtered) but it puts a blank line between
   every line of a code block, where raw text is preserved. `plainText` drops the newline only,
   never the indentation after it.
+- **`--clean` into a cloud-synced folder produces duplicates.** Deleting a notebook directory
+  and immediately rewriting the same filenames lets iCloud/Dropbox restore what it had not
+  finished uploading. Real case: four `--clean` runs into an iCloud Desktop folder turned 214
+  notes into 540 files. Tell duplicates apart by the naming — the sync client writes
+  `Note 2.md`, `Slug.disambiguate` writes `Note-2.md`. Build somewhere local and `mv` into place.
 - **`<div>` is a line, not a paragraph.** Getting this backwards double-spaces every note and
   discards the author's real blank lines. This was the single biggest output-quality bug.
 
